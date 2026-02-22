@@ -7,10 +7,9 @@
     <style>
         body {
             background-color: #121212;
-            color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
@@ -18,61 +17,59 @@
             text-align: center;
         }
         .container {
-            padding: 2rem;
             border: 1px solid #333;
+            padding: 2rem;
             border-radius: 12px;
             background-color: #1e1e1e;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
         }
         h1 {
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
-            background: linear-gradient(45deg, #00c6ff, #0072ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: #4caf50;
+            margin-bottom: 0.5rem;
         }
-        .time {
-            font-size: 1.5rem;
-            margin: 1.5rem 0;
-            font-weight: 300;
-            color: #aaaaaa;
+        p {
+            margin: 0.5rem 0;
+            color: #b0b0b0;
         }
         .info {
-            font-size: 1rem;
-            color: #666;
-            margin-top: 2rem;
-            border-top: 1px solid #333;
-            padding-top: 1rem;
+            margin-top: 1.5rem;
+            text-align: left;
+            background: #252526;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        .time {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #64b5f6;
+            margin: 1rem 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>OpenClaw 자율 코딩 테스트 성공!</h1>
-        <div class="time" id="clock">Loading time...</div>
+        <div class="time" id="clock"></div>
+        <p>생성 시각 (UTC): 2026-02-22 06:38</p>
+        
         <div class="info">
-            <p>System: OpenClaw Agent Environment</p>
-            <p>OS: Linux (WSL2)</p>
+            <p><strong>System Info:</strong></p>
+            <p>OS: Linux 6.6.87.2-microsoft-standard-WSL2 (x64)</p>
             <p>Node: v22.22.0</p>
-            <p>Created by: Hwani-Net (Agent)</p>
+            <p>Environment: OpenClaw (Host: fca389e9b5f5)</p>
         </div>
     </div>
 
     <script>
-        function updateTime() {
+        function updateClock() {
             const now = new Date();
-            const timeString = now.toLocaleTimeString('ko-KR', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric', 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit' 
-            });
-            document.getElementById('clock').textContent = timeString;
+            document.getElementById('clock').innerText = now.toLocaleString();
         }
-        setInterval(updateTime, 1000);
-        updateTime();
+        setInterval(updateClock, 1000);
+        updateClock();
     </script>
 </body>
 </html>
