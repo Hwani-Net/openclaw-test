@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sky Rush - Flight Sim</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --panel: rgba(2, 6, 23, 0.6);
+      --line: rgba(148, 163, 184, 0.35);
+      --text: #e2e8f0;
+      --accent: #38bdf8;
+      --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    #game {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      background: radial-gradient(circle at 50% 30%, #082f49 0%, #020617 70%);
+    }
+    .hud {
+      position: fixed;
+      inset: 16px 16px auto 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+      border-radius: 14px;
+      padding: 12px 14px;
+      min-width: 220px;
+      box-shadow: 0 8px 30px rgba(2, 6, 23, 0.45);
+    }
+    .title {
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+    .value {
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+    .reticle {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      width: 18px;
+      height: 18px;
+      transform: translate(-50%, -50%);
+      border: 2px solid rgba(125, 211, 252, .8);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 8;
+      box-shadow: 0 0 16px rgba(56, 189, 248, .35);
+    }
+    .help {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #cbd5e1;
+      z-index: 10;
+    }
+    .help b { color: #e2e8f0; }
+    .notice {
+      position: fixed;
+      left: 50%;
+      top: 14%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, .75);
+      border: 1px solid rgba(125, 211, 252, .4);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 13px;
+      color: #bae6fd;
+      z-index: 12;
+      opacity: 0;
+      transition: opacity .25s ease;
+      pointer-events: none;
+    }
+    .notice.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div class="hud">
+    <div class="panel">
+      <div class="title">Mission</div>
+      <div class="value" id="score">0</div>
+      <div class="row"><span>Best</span><b id="best">0</b></div>
+      <div class="row"><span>Checkpoints Left</span><b id="left">0</b></div>
+    </div>
+    <div class="panel">
+      <div class="title">Flight</div>
+      <div class="row"><span>Speed</span><b id="speed">0</b></div>
+      <div class="row"><span>Altitude</span><b id="alt">0</b></div>
+      <div class="row"><span>Throttle</span><b id="throttle">0%</b></div>
+    </div>
+  </div>
+
+  <div class="reticle"></div>
+  <div class="notice" id="notice">Checkpoint +1</div>
+
+  <div class="help">
+    <b>조작</b><br>
+    W/S: Pitch · A/D: Roll · Q/E: Yaw<br>
+    ↑/↓: Throttle · Shift: Boost · R: Reset
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  const ui = {
+    score: document.getElementById('score'),
+    best: document.getElementById('best'),
+    left: document.getElementById('left'),
+    speed: document.getElementById('speed'),
+    alt: document.getElementById('alt'),
+    throttle: document.getElementById('throttle'),
+    notice: document.getElementById('notice')
+  };
+
+  const keys = new Set();
+  let w = 0, h = 0, cx = 0, cy = 0;
+
+  const state = {
+    x: 0, y: 120, z: 0,
+    yaw: 0, pitch: 0, roll: 0,
+    speed: 90,
+    throttle: 62,
+    score: 0,
+    best: Number(localStorage.getItem('sky-rush-best') || 0),
+    rings: [],
+    stars: [],
+    hills: []
+  };
+
+  function showNotice(text) {
+    ui.notice.textContent = text;
+    ui.notice.classList.add('show');
+    clearTimeout(showNotice.t);
+    showNotice.t = setTimeout(() => ui.notice.classList.remove('show'), 850);
+  }
+
+  function resize() {
+    w = canvas.width = innerWidth * devicePixelRatio;
+    h = canvas.height = innerHeight * devicePixelRatio;
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    w = innerWidth;
+    h = innerHeight;
+    cx = w * 0.5;
+    cy = h * 0.5;
+  }
+
+  function rand(min, max) {
+    return Math.random() * (max - min) + min;
+  }
+
+  function spawnWorld() {
+    state.rings.length = 0;
+    state.stars.length = 0;
+    state.hills.length = 0;
+
+    let z = 1200;
+    for (let i = 0; i < 22; i++) {
+      state.rings.push({
+        x: rand(-450, 450),
+        y: rand(80, 320),
+        z,
+        r: rand(42, 70),
+        passed: false
+      });
+      z += rand(420, 700);
+    }
+
+    for (let i = 0; i < 260; i++) {
+      state.stars.push({ x: rand(-2200, 2200), y: rand(200, 1700), z: rand(500, 9000) });
+    }
+
+    for (let i = 0; i < 220; i++) {
+      state.hills.push({
+        x: rand(-2400, 2400),
+        z: rand(150, 9000),
+        h: rand(18, 90),
+        w: rand(28, 88)
+      });
+    }
+  }
+
+  function resetFlight(full = false) {
+    state.x = 0;
+    state.y = 120;
+    state.z = 0;
+    state.yaw = 0;
+    state.pitch = 0;
+    state.roll = 0;
+    state.speed = 90;
+    state.throttle = 62;
+    if (full) {
+      state.score = 0;
+      spawnWorld();
+    }
+  }
+
+  function forwardVector(yaw, pitch) {
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    return { x: sy * cp, y: sp, z: cy * cp };
+  }
+
+  function toCamera(wx, wy, wz) {
+    // Translate
+    let x = wx - state.x;
+    let y = wy - state.y;
+    let z = wz - state.z;
+
+    // Inverse yaw
+    let c = Math.cos(-state.yaw), s = Math.sin(-state.yaw);
+    let tx = x * c - z * s;
+    let tz = x * s + z * c;
+    x = tx; z = tz;
+
+    // Inverse pitch
+    c = Math.cos(-state.pitch); s = Math.sin(-state.pitch);
+    let ty = y * c - z * s;
+    tz = y * s + z * c;
+    y = ty; z = tz;
+
+    // Inverse roll
+    c = Math.cos(-state.roll); s = Math.sin(-state.roll);
+    tx = x * c - y * s;
+    ty = x * s + y * c;
+    x = tx; y = ty;
+
+    return { x, y, z };
+  }
+
+  function project(v) {
+    const f = 860;
+    if (v.z <= 2) return null;
+    return { x: cx + (v.x / v.z) * f, y: cy - (v.y / v.z) * f, z: v.z, s: f / v.z };
+  }
+
+  function drawSkyAndHorizon() {
+    ctx.clearRect(0, 0, w, h);
+
+    // Sky glow
+    const g = ctx.createRadialGradient(cx, cy * .65, 40, cx, cy * .65, Math.max(w, h));
+    g.addColorStop(0, '#0b3a5b');
+    g.addColorStop(0.38, '#09263f');
+    g.addColorStop(1, '#020617');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+
+    // Artificial horizon based on pitch + roll
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-state.roll);
+
+    const horizonY = state.pitch * 320;
+
+    ctx.fillStyle = 'rgba(3, 105, 161, 0.28)';
+    ctx.fillRect(-w, -h * 2 + horizonY, w * 2, h * 2);
+    ctx.fillStyle = 'rgba(22, 101, 52, 0.23)';
+    ctx.fillRect(-w, horizonY, w * 2, h * 2);
+
+    ctx.strokeStyle = 'rgba(186, 230, 253, 0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-w, horizonY);
+    ctx.lineTo(w, horizonY);
+    ctx.stroke();
+
+    // Pitch ladder
+    ctx.strokeStyle = 'rgba(186, 230, 253, 0.45)';
+    ctx.lineWidth = 1;
+    for (let i = -6; i <= 6; i++) {
+      if (i === 0) continue;
+      const y = horizonY + i * 42;
+      const len = i % 2 === 0 ? 70 : 44;
+      ctx.beginPath();
+      ctx.moveTo(-len, y);
+      ctx.lineTo(len, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawStars() {
+    ctx.fillStyle = 'rgba(226, 232, 240, 0.75)';
+    for (const s of state.stars) {
+      const p = project(toCamera(s.x, s.y, s.z));
+      if (!p || p.x < -10 || p.x > w + 10 || p.y < -10 || p.y > h + 10) continue;
+      const size = Math.max(0.6, Math.min(2.1, p.s * 4));
+      ctx.fillRect(p.x, p.y, size, size);
+    }
+  }
+
+  function drawHills() {
+    for (const m of state.hills) {
+      const base = project(toCamera(m.x, 0, m.z));
+      const top = project(toCamera(m.x, m.h, m.z));
+      if (!base || !top) continue;
+
+      const width = Math.max(1.2, (m.w / base.z) * 860);
+      const yTop = top.y;
+      const yBase = base.y;
+      if (yTop > h || yBase < 0) continue;
+
+      const alpha = Math.max(0.1, Math.min(0.55, 2500 / base.z));
+      ctx.fillStyle = `rgba(16,185,129,${alpha})`;
+      ctx.beginPath();
+      ctx.moveTo(base.x - width, yBase);
+      ctx.lineTo(base.x + width, yBase);
+      ctx.lineTo(base.x, yTop);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function drawRings() {
+    let left = 0;
+    for (const r of state.rings) {
+      if (r.passed) continue;
+      left++;
+      const c = toCamera(r.x, r.y, r.z);
+      const p = project(c);
+      if (!p) continue;
+      const rp = (r.r / c.z) * 860;
+      if (rp < 2 || p.x < -120 || p.x > w + 120 || p.y < -120 || p.y > h + 120) continue;
+
+      const near = c.z < 520;
+      ctx.strokeStyle = near ? 'rgba(251,191,36,0.95)' : 'rgba(56,189,248,0.8)';
+      ctx.lineWidth = near ? 4 : 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, rp, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, rp * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ui.left.textContent = left;
+  }
+
+  function update(dt) {
+    // Controls
+    const pitchRate = 1.25;
+    const rollRate = 1.55;
+    const yawRate = 1.0;
+
+    if (keys.has('KeyW')) state.pitch += pitchRate * dt;
+    if (keys.has('KeyS')) state.pitch -= pitchRate * dt;
+    if (keys.has('KeyA')) state.roll -= rollRate * dt;
+    if (keys.has('KeyD')) state.roll += rollRate * dt;
+    if (keys.has('KeyQ')) state.yaw -= yawRate * dt;
+    if (keys.has('KeyE')) state.yaw += yawRate * dt;
+
+    if (keys.has('ArrowUp')) state.throttle += 38 * dt;
+    if (keys.has('ArrowDown')) state.throttle -= 38 * dt;
+
+    state.throttle = Math.max(0, Math.min(100, state.throttle));
+
+    // Auto turn from banking
+    state.yaw += state.roll * 0.42 * dt;
+
+    // Damping and limits
+    state.pitch *= 0.995;
+    state.roll *= 0.992;
+
+    const maxPitch = 0.95;
+    const maxRoll = 1.35;
+    state.pitch = Math.max(-maxPitch, Math.min(maxPitch, state.pitch));
+    state.roll = Math.max(-maxRoll, Math.min(maxRoll, state.roll));
+
+    // Speed
+    const targetSpeed = 55 + state.throttle * 1.05;
+    state.speed += (targetSpeed - state.speed) * Math.min(1, dt * 2.2);
+
+    if (keys.has('ShiftLeft') || keys.has('ShiftRight')) {
+      state.speed += 44 * dt;
+    }
+    state.speed = Math.max(35, Math.min(200, state.speed));
+
+    // Move
+    const fwd = forwardVector(state.yaw, state.pitch);
+    state.x += fwd.x * state.speed * dt;
+    state.y += fwd.y * state.speed * dt;
+    state.z += fwd.z * state.speed * dt;
+
+    // Lift / gravity approximation
+    const lift = state.speed * 0.12;
+    state.y += (lift - 11.2) * dt;
+
+    // Ground hit
+    if (state.y < 8) {
+      state.best = Math.max(state.best, state.score);
+      localStorage.setItem('sky-rush-best', state.best);
+      showNotice('충돌! 재시작');
+      resetFlight(true);
+      return;
+    }
+
+    // Ring pass detection + respawn ahead
+    for (const r of state.rings) {
+      if (r.passed) continue;
+      const dx = r.x - state.x;
+      const dy = r.y - state.y;
+      const dz = r.z - state.z;
+      const dist = Math.hypot(dx, dy, dz);
+      if (dist < r.r * 0.8 && dz < 80) {
+        r.passed = true;
+        state.score += 1;
+        state.best = Math.max(state.best, state.score);
+        localStorage.setItem('sky-rush-best', state.best);
+        showNotice('Checkpoint +1');
+
+        // recycle ring far ahead
+        r.x = state.x + rand(-500, 500);
+        r.y = Math.max(60, state.y + rand(-120, 220));
+        r.z = state.z + rand(4500, 6000);
+        r.r = rand(42, 72);
+        r.passed = false;
+      }
+    }
+  }
+
+  function render() {
+    drawSkyAndHorizon();
+    drawStars();
+    drawHills();
+    drawRings();
+
+    // Compass line
+    ctx.strokeStyle = 'rgba(56,189,248,0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 60, cy);
+    ctx.lineTo(cx - 20, cy);
+    ctx.moveTo(cx + 20, cy);
+    ctx.lineTo(cx + 60, cy);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(56,189,248,0.75)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 9);
+    ctx.lineTo(cx - 7, cy + 8);
+    ctx.lineTo(cx + 7, cy + 8);
+    ctx.closePath();
+    ctx.fill();
+
+    // HUD updates
+    ui.score.textContent = state.score;
+    ui.best.textContent = state.best;
+    ui.speed.textContent = `${Math.round(state.speed)} kt`;
+    ui.alt.textContent = `${Math.max(0, Math.round(state.y))} m`;
+    ui.throttle.textContent = `${Math.round(state.throttle)}%`;
+  }
+
+  let last = performance.now();
+  function tick(now) {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(tick);
+  }
+
+  addEventListener('resize', resize);
+  addEventListener('keydown', (e) => {
+    keys.add(e.code);
+    if (e.code === 'KeyR') {
+      state.best = Math.max(state.best, state.score);
+      localStorage.setItem('sky-rush-best', state.best);
+      resetFlight(true);
+      showNotice('리셋 완료');
+    }
+  });
+  addEventListener('keyup', (e) => keys.delete(e.code));
+
+  resize();
+  spawnWorld();
+  resetFlight(false);
+  ui.best.textContent = state.best;
+  showNotice('Sky Rush 시작');
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
