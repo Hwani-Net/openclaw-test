@@ -1,0 +1,25 @@
+{
+  "recommended": [
+    {"id":"starter_pack","name":"첫결제 스타터팩","price":"₩3,900","tag":"BEST","desc":"캐시 500 + 즉시완료 티켓 10 + 한정 간판"},
+    {"id":"offline_x2_8h","name":"오프라인 수익 2배 (8시간)","price":"₩3,300","tag":"HOT","desc":"오프라인 보상 수령 시 2배 적용"},
+    {"id":"season_pass","name":"시즌 패스 프리미엄","price":"₩9,900","tag":"SEASON","desc":"프리미엄 보상 + 한정 스킨"}
+  ],
+  "convenience": [
+    {"id":"instant_ticket_10","name":"즉시완료 티켓 x10","price":"₩2,900","desc":"대기시간 즉시 완료"},
+    {"id":"storage_plus","name":"저장고 확장 +20%","price":"₩4,900","desc":"오프라인 수익 보관량 증가"}
+  ],
+  "growth": [
+    {"id":"recipe_slot","name":"레시피 슬롯 +1","price":"₩5,900","desc":"동시 제작 가능한 메뉴 증가"},
+    {"id":"booster_mid","name":"설비 강화권(중급)","price":"₩9,900","desc":"분당 생산량 상승"}
+  ],
+  "skins": [
+    {"id":"skin_neon_cart","name":"네온 포장마차 스킨","price":"₩7,900","desc":"외형 커스터마이징 (비경쟁)"},
+    {"id":"skin_winter","name":"겨울 시즌 간판팩","price":"₩4,900","desc":"한정 간판 + 이펙트"}
+  ],
+  "pass": [
+    {"id":"pass_premium","name":"시즌 패스","price":"₩9,900","desc":"30일 미션 보상 확장"}
+  ],
+  "vip": [
+    {"id":"vip_month","name":"VIP 월정액","price":"₩6,900/월","desc":"광고 제거 + 일일 캐시 +10%"}
+  ]
+}

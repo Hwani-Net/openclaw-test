@@ -1,0 +1,26 @@
+{
+  "skill": {
+    "world": [
+      {"rank":1,"name":"NeoChef_99","score":128940,"region":"Seoul"},
+      {"rank":2,"name":"TokyoRush","score":127310,"region":"Tokyo"},
+      {"rank":3,"name":"BusanAce","score":124880,"region":"Busan"}
+    ],
+    "country": [
+      {"rank":1,"name":"HwaniMaster","score":119920,"region":"KR"},
+      {"rank":2,"name":"DaejeonFox","score":115400,"region":"KR"},
+      {"rank":3,"name":"JejuWind","score":112800,"region":"KR"}
+    ]
+  },
+  "business": {
+    "world": [
+      {"rank":1,"name":"CashFlowMax","score":9820000,"region":"LA"},
+      {"rank":2,"name":"MarketTiger","score":9640000,"region":"Berlin"},
+      {"rank":3,"name":"GangnamBoss","score":9510000,"region":"Seoul"}
+    ],
+    "country": [
+      {"rank":1,"name":"HwaniMaster","score":9210000,"region":"KR"},
+      {"rank":2,"name":"MapoChef","score":9030000,"region":"KR"},
+      {"rank":3,"name":"IncheonPro","score":8890000,"region":"KR"}
+    ]
+  }
+}

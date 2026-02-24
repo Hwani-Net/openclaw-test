@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>Street Booth Tycoon - UX Prototype</title>
+  <style>
+    :root{
+      --bg:#070b1a; --bg2:#0f172a; --card:rgba(15,23,42,.78); --line:rgba(148,163,184,.35);
+      --text:#e2e8f0; --muted:#94a3b8; --cyan:#22d3ee; --pink:#f472b6; --green:#22c55e; --yellow:#f59e0b;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1200px 700px at 20% -20%,#06b6d433,transparent 50%),linear-gradient(180deg,var(--bg2),var(--bg));color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+    .phone{width:min(430px,100vw);height:100vh;margin:0 auto;display:flex;flex-direction:column;border-left:1px solid #1e293b;border-right:1px solid #1e293b;background:linear-gradient(180deg,rgba(2,6,23,.65),rgba(2,6,23,.92));overflow:hidden}
+    .top{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid #1e293b;background:rgba(2,6,23,.6)}
+    .wallet{display:flex;gap:6px;flex-wrap:wrap}
+    .chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:5px 9px;background:rgba(15,23,42,.72)}
+    .chip b{color:#f8fafc}
+    .shop-btn{border:1px solid rgba(34,211,238,.6);background:rgba(34,211,238,.12);color:#a5f3fc;border-radius:10px;padding:8px 10px;font-weight:700}
+
+    .content{flex:1;overflow:auto;padding:12px}
+    .screen{display:none;gap:10px}
+    .screen.active{display:grid}
+
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;backdrop-filter:blur(6px)}
+    .title{font-weight:800;letter-spacing:.02em}
+    .sub{font-size:12px;color:var(--muted)}
+
+    .hero{height:120px;border-radius:12px;background:linear-gradient(120deg,#0ea5e933,#a855f733),linear-gradient(180deg,#111827,#0f172a);display:flex;align-items:flex-end;padding:10px}
+    .hero .title{font-size:18px}
+
+    .offline{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .btn{border:1px solid var(--line);background:#111827;color:var(--text);border-radius:10px;padding:8px 10px;font-weight:700}
+    .btn.primary{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.6);color:#bbf7d0}
+    .btn.cyan{background:rgba(34,211,238,.15);border-color:rgba(34,211,238,.6);color:#a5f3fc}
+
+    .tabs{display:flex;gap:6px;overflow:auto;padding-bottom:2px}
+    .tab{flex:0 0 auto;font-size:12px;padding:7px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:#0b1225}
+    .tab.active{color:#0f172a;background:#67e8f9;border-color:#67e8f9;font-weight:800}
+
+    .sku{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px;border-radius:12px;border:1px solid #334155;background:#0b1225}
+    .sku .name{font-weight:800}
+    .tag{font-size:10px;padding:2px 6px;border-radius:999px;border:1px solid #334155;color:#cbd5e1}
+    .tag.hot{color:#fef3c7;border-color:#f59e0b;background:#f59e0b22}
+    .tag.best{color:#cffafe;border-color:#22d3ee;background:#22d3ee22}
+    .buy{align-self:center;border:1px solid rgba(34,211,238,.6);background:#22d3ee22;color:#a5f3fc;border-radius:10px;padding:8px 9px;font-weight:800}
+
+    .rank-head{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .select{padding:8px;border-radius:10px;background:#0b1225;color:#e2e8f0;border:1px solid #334155;font-weight:700}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:8px;border-bottom:1px solid #1f2937;text-align:left}
+    th{color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+
+    .bottom{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #1e293b;background:#020617}
+    .nav{border:none;background:transparent;color:#64748b;padding:10px 6px;font-weight:700}
+    .nav.active{color:#a5f3fc}
+
+    .modal,.sheet{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,.65);z-index:20}
+    .modal.show,.sheet.show{display:flex}
+    .box{width:min(360px,92vw);background:#0b1225;border:1px solid #334155;border-radius:16px;padding:14px}
+    .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+
+    .sheet{align-items:flex-end}
+    .panel{width:min(430px,100vw);background:#0b1225;border-top-left-radius:18px;border-top-right-radius:18px;border:1px solid #334155;padding:14px}
+    .line{display:flex;justify-content:space-between;margin:6px 0;color:#cbd5e1}
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <div class="top">
+      <div class="wallet">
+        <div class="chip">코인 <b>128,550</b></div>
+        <div class="chip">무료캐시 <b>480</b></div>
+        <div class="chip">유료캐시 <b>120</b></div>
+      </div>
+      <button class="shop-btn" id="quickShop">SHOP</button>
+    </div>
+
+    <div class="content">
+      <section class="screen active" id="screen-home">
+        <div class="hero card">
+          <div>
+            <div class="title">포장마차 타이쿤</div>
+            <div class="sub">오늘 매출 2,930,000원 · 친구랭킹 14위</div>
+          </div>
+        </div>
+
+        <div class="card offline">
+          <div>
+            <div class="title">오프라인 수익 도착</div>
+            <div class="sub">골드 48,200 / 무료캐시 +6 (4시간 20분 누적)</div>
+          </div>
+          <div style="display:grid;gap:6px">
+            <button class="btn">무료 수령</button>
+            <button class="btn cyan" id="btnOffline2x">2배 수령</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="title">오늘의 미션</div>
+          <div class="sub">• 붕어빵 80개 판매 · • 콤보 20회 달성 · • 친구 1명 초대</div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-shop">
+        <div class="tabs" id="shopTabs"></div>
+        <div id="shopList" style="display:grid;gap:8px"></div>
+      </section>
+
+      <section class="screen" id="screen-rank">
+        <div class="rank-head">
+          <select class="select" id="scopeSel">
+            <option value="world">월드</option>
+            <option value="country" selected>국가</option>
+            <option value="city">도시</option>
+            <option value="neighborhood">동네</option>
+            <option value="friends">친구</option>
+          </select>
+          <select class="select" id="typeSel">
+            <option value="skill">실력 점수</option>
+            <option value="business">운영 점수</option>
+          </select>
+        </div>
+        <div class="tabs" id="periodTabs">
+          <button class="tab active">일간</button>
+          <button class="tab">주간</button>
+          <button class="tab">월간</button>
+          <button class="tab">시즌</button>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>#</th><th>닉네임</th><th>점수</th><th>지역</th></tr></thead>
+            <tbody id="rankBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="bottom">
+      <button class="nav active" data-screen="home">홈</button>
+      <button class="nav" data-screen="shop">상점</button>
+      <button class="nav" data-screen="rank">랭킹</button>
+    </div>
+  </div>
+
+  <div class="modal" id="offlineModal">
+    <div class="box">
+      <div class="title">오프라인 2배 수령</div>
+      <div class="sub" style="margin-top:6px">캐시 29 사용 시 이번 오프라인 보상을 2배로 받습니다.</div>
+      <div class="actions">
+        <button class="btn" id="offCancel">취소</button>
+        <button class="btn cyan" id="offConfirm">결제</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet" id="buySheet">
+    <div class="panel">
+      <div class="title" id="buyName">상품명</div>
+      <div class="sub" id="buyDesc" style="margin-top:4px"></div>
+      <div class="line"><span>가격</span><b id="buyPrice">₩0</b></div>
+      <div class="line"><span>지급</span><b>즉시 지급</b></div>
+      <div class="actions" style="margin-top:12px">
+        <button class="btn" id="buyCancel">취소</button>
+        <button class="btn primary" id="buyConfirm">결제하기</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(async () => {
+  const tabs = [
+    { key: 'recommended', label: '추천' },
+    { key: 'convenience', label: '편의' },
+    { key: 'growth', label: '성장' },
+    { key: 'skins', label: '스킨' },
+    { key: 'pass', label: '패스' },
+    { key: 'vip', label: 'VIP' }
+  ];
+
+  const state = {
+    currentScreen: 'home',
+    shopTab: 'recommended',
+    catalog: null,
+    ranking: null,
+    selectedSku: null
+  };
+
+  const $ = (q) => document.querySelector(q);
+  const $$ = (q) => [...document.querySelectorAll(q)];
+
+  function toast(msg){
+    const el = document.createElement('div');
+    el.textContent = msg;
+    Object.assign(el.style,{position:'fixed',left:'50%',top:'72px',transform:'translateX(-50%)',background:'#22d3ee22',color:'#a5f3fc',border:'1px solid #22d3ee99',padding:'8px 11px',borderRadius:'999px',fontWeight:'700',zIndex:50});
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),900);
+  }
+
+  async function loadData(){
+    const [c,r] = await Promise.all([
+      fetch('./mock/catalog.json').then(v=>v.json()),
+      fetch('./mock/ranking.json').then(v=>v.json())
+    ]);
+    state.catalog = c; state.ranking = r;
+  }
+
+  function setScreen(name){
+    state.currentScreen = name;
+    $$('.screen').forEach(s=>s.classList.remove('active'));
+    $(`#screen-${name}`).classList.add('active');
+    $$('.nav').forEach(n=>n.classList.toggle('active', n.dataset.screen === name));
+    if(name==='shop') renderShop();
+    if(name==='rank') renderRank();
+  }
+
+  function renderShopTabs(){
+    const box = $('#shopTabs');
+    box.innerHTML = tabs.map(t=>`<button class="tab ${state.shopTab===t.key?'active':''}" data-tab="${t.key}">${t.label}</button>`).join('');
+    box.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{state.shopTab=b.dataset.tab;renderShop();});
+  }
+
+  function tagClass(tag=''){ return tag.toLowerCase()==='hot'?'hot':tag.toLowerCase()==='best'?'best':''; }
+
+  function renderShop(){
+    renderShopTabs();
+    const list = state.catalog?.[state.shopTab] || [];
+    $('#shopList').innerHTML = list.map(i=>`
+      <div class="sku">
+        <div>
+          <div style="display:flex;gap:6px;align-items:center"><span class="name">${i.name}</span>${i.tag?`<span class="tag ${tagClass(i.tag)}">${i.tag}</span>`:''}</div>
+          <div class="sub" style="margin-top:4px">${i.desc}</div>
+        </div>
+        <button class="buy" data-id="${i.id}">${i.price}</button>
+      </div>
+    `).join('');
+
+    $('#shopList').querySelectorAll('.buy').forEach(btn=>{
+      btn.onclick = () => {
+        state.selectedSku = list.find(x=>x.id===btn.dataset.id);
+        $('#buyName').textContent = state.selectedSku.name;
+        $('#buyDesc').textContent = state.selectedSku.desc;
+        $('#buyPrice').textContent = state.selectedSku.price;
+        $('#buySheet').classList.add('show');
+      };
+    });
+  }
+
+  function pickRankRows(){
+    const scope = $('#scopeSel').value;
+    const type = $('#typeSel').value;
+    const src = state.ranking?.[type] || {};
+    return src[scope] || src.country || [];
+  }
+
+  function renderRank(){
+    const rows = pickRankRows();
+    $('#rankBody').innerHTML = rows.map(r=>`<tr><td>${r.rank}</td><td>${r.name}</td><td>${Number(r.score).toLocaleString()}</td><td>${r.region}</td></tr>`).join('');
+  }
+
+  // events
+  $$('.nav').forEach(n=>n.onclick=()=>setScreen(n.dataset.screen));
+  $('#quickShop').onclick = () => setScreen('shop');
+
+  $('#btnOffline2x').onclick = () => $('#offlineModal').classList.add('show');
+  $('#offCancel').onclick = () => $('#offlineModal').classList.remove('show');
+  $('#offConfirm').onclick = () => { $('#offlineModal').classList.remove('show'); toast('오프라인 2배 수령 결제 완료'); };
+
+  $('#buyCancel').onclick = () => $('#buySheet').classList.remove('show');
+  $('#buyConfirm').onclick = () => {
+    const name = state.selectedSku?.name || '상품';
+    $('#buySheet').classList.remove('show');
+    toast(`${name} 결제 완료`);
+  };
+
+  $('#scopeSel').onchange = renderRank;
+  $('#typeSel').onchange = renderRank;
+
+  // bootstrap
+  try {
+    await loadData();
+    renderShop();
+    renderRank();
+  } catch (e) {
+    console.error(e);
+    toast('데이터 로드 실패');
+  }
+})();
+</script>
+</body>
+</html>
