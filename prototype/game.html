@@ -465,9 +465,9 @@
       `;
       const btn = document.createElement('button');
       btn.className = 'cook-btn';
+      btn.dataset.key = key;
       btn.textContent = st.busy ? `조리중 ${(st.left/1000).toFixed(1)}s` : '조리 시작';
       btn.disabled = st.busy || !state.running || state.paused || state.ended;
-      btn.onclick = () => startCook(key, btn);
       div.appendChild(btn);
       stationsEl.appendChild(div);
     }
@@ -480,9 +480,9 @@
       const c = state.tray[key] || 0;
       const b = document.createElement('button');
       b.className = 'tray-btn';
+      b.dataset.key = key;
       b.disabled = c <= 0 || !state.running || state.paused || state.ended;
       b.textContent = `${r.emoji} ${r.name} · ${c}`;
-      b.onclick = () => serveFromTray(key, b);
       trayEl.appendChild(b);
     }
   }
@@ -499,7 +499,10 @@
 
   function startCook(key, btn){
     const st = state.stations[key];
-    if (st.busy || !state.running || state.paused || state.ended) return;
+    if (!state.running) { toast('먼저 게임 시작을 눌러주세요'); return; }
+    if (state.paused) { toast('일시정지 중입니다'); return; }
+    if (state.ended) return;
+    if (st.busy) return;
     const base = RECIPES[key].cookMs;
     const feverOn = state.feverUntil > now();
     const total = feverOn ? Math.floor(base * 0.82) : base;
@@ -812,6 +815,26 @@
   }
 
   // -------- Events --------
+  stationsEl.addEventListener('pointerdown', (e) => {
+    const btn = e.target.closest('.cook-btn');
+    if (!btn) return;
+    e.preventDefault();
+    enableAudio();
+    const key = btn.dataset.key;
+    if (!key) return;
+    startCook(key, btn);
+  }, { passive: false });
+
+  trayEl.addEventListener('pointerdown', (e) => {
+    const btn = e.target.closest('.tray-btn');
+    if (!btn) return;
+    e.preventDefault();
+    enableAudio();
+    const key = btn.dataset.key;
+    if (!key) return;
+    serveFromTray(key, btn);
+  }, { passive: false });
+
   $('#pauseBtn').onclick = () => { enableAudio(); togglePause(); playSfx('start'); };
   $('#startBtn').onclick = () => {
     enableAudio();
