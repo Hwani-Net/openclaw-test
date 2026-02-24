@@ -66,7 +66,10 @@
     .panel{width:min(430px,100vw);background:#fff;border-top-left-radius:18px;border-top-right-radius:18px;border:1px solid #fbcfe8;padding:14px}
     .line{display:flex;justify-content:space-between;margin:6px 0;color:#334155}
 
-    .card,.sku,.btn,.buy,.tab,.nav,.shop-btn,.sound-btn{transition:transform .12s ease,box-shadow .2s ease,filter .2s ease}
+    .audio-fab{position:fixed;right:14px;bottom:84px;z-index:70;border:1px solid #22d3ee;background:linear-gradient(180deg,#a5f3fc,#67e8f9);color:#0e7490;border-radius:999px;padding:10px 14px;font-weight:900;box-shadow:0 10px 24px rgba(34,211,238,.35);display:none}
+    .audio-fab.show{display:block;animation:pulse 1.6s infinite}
+
+    .card,.sku,.btn,.buy,.tab,.nav,.shop-btn,.sound-btn,.audio-fab{transition:transform .12s ease,box-shadow .2s ease,filter .2s ease}
     .card{animation:floatIn .45s ease}
     .btn:active,.buy:active,.tab:active,.nav:active,.shop-btn:active,.sound-btn:active{transform:scale(.97)}
     .btn:hover,.buy:hover{filter:brightness(1.03)}
@@ -74,6 +77,7 @@
     #fxCanvas{position:fixed;inset:0;pointer-events:none;z-index:60}
 
     @keyframes floatIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,211,238,.45)}70%{box-shadow:0 0 0 16px rgba(34,211,238,0)}100%{box-shadow:0 0 0 0 rgba(34,211,238,0)}}
   </style>
 </head>
 <body>
@@ -158,6 +162,7 @@
   </div>
 
   <canvas id="fxCanvas"></canvas>
+  <button class="audio-fab show" id="audioFab">🔊 사운드 시작</button>
 
   <div class="modal" id="offlineModal">
     <div class="box">
@@ -203,6 +208,7 @@
     audioReady: false,
     audioOn: true,
     audioCtx: null,
+    masterGain: null,
     bgmTimer: null,
     particles: [],
     lastSfxAt: 0
@@ -213,9 +219,8 @@
 
   document.addEventListener('pointerdown', (e) => {
     const t = e.target.closest('button,.tab,.buy,.nav,.select');
-    if (!t) return;
-    unlockAudio();
-    if (state.audioOn) clickSfx();
+    enableAudio();
+    if (t && state.audioOn) clickSfx();
   }, { passive: true });
 
   document.addEventListener('visibilitychange', () => {
@@ -273,23 +278,37 @@
   requestAnimationFrame(tickFx);
 
   function ensureAudio(){
-    if (state.audioReady) return;
+    if (state.audioReady) return true;
     const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
+    if (!AC) return false;
     state.audioCtx = new AC();
+    state.masterGain = state.audioCtx.createGain();
+    state.masterGain.gain.value = 0.22;
+    state.masterGain.connect(state.audioCtx.destination);
     state.audioReady = true;
+    return true;
   }
 
   function unlockAudio(){
-    ensureAudio();
+    if (!ensureAudio()) return false;
     if (state.audioCtx && state.audioCtx.state === 'suspended') {
       state.audioCtx.resume();
     }
+    $('#audioFab')?.classList.remove('show');
     if (state.audioOn) startCuteBgm();
+    return true;
   }
 
-  function tone(freq, dur = 0.08, type = 'triangle', vol = 0.05, at = null) {
-    if (!state.audioOn || !state.audioCtx) return;
+  function enableAudio(){
+    const ok = unlockAudio();
+    if (ok && state.audioOn) {
+      clickSfx();
+      startCuteBgm();
+    }
+  }
+
+  function tone(freq, dur = 0.08, type = 'triangle', vol = 0.06, at = null) {
+    if (!state.audioOn || !state.audioCtx || !state.masterGain) return;
     const ctx = state.audioCtx;
     const t0 = at ?? ctx.currentTime;
     const osc = ctx.createOscillator();
@@ -299,40 +318,46 @@
     gain.gain.setValueAtTime(0.0001, t0);
     gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(state.masterGain);
     osc.start(t0);
     osc.stop(t0 + dur + 0.02);
   }
 
   function playClick(){
-    tone(880, 0.06, 'triangle', 0.03);
+    tone(980, 0.075, 'triangle', 0.065);
   }
 
   function clickSfx(){
     const now = performance.now();
-    if (now - state.lastSfxAt < 110) return;
+    if (now - state.lastSfxAt < 90) return;
     state.lastSfxAt = now;
     playClick();
   }
 
   function playHit(){
     const t = state.audioCtx?.currentTime || 0;
-    tone(520, 0.08, 'square', 0.04, t);
-    tone(780, 0.11, 'triangle', 0.03, t + 0.02);
+    tone(420, 0.09, 'square', 0.09, t);
+    tone(640, 0.12, 'triangle', 0.08, t + 0.02);
+    tone(860, 0.13, 'sine', 0.06, t + 0.04);
   }
 
-  const melody = [523.25, 659.25, 783.99, 659.25, 587.33, 659.25, 698.46, 783.99];
+  const melody = [523.25, 659.25, 783.99, 659.25, 587.33, 698.46, 783.99, 880.0];
+  const bass = [130.81, 146.83, 164.81, 196.0];
   function startCuteBgm(){
     if (!state.audioOn || !state.audioCtx || state.bgmTimer) return;
     const ctx = state.audioCtx;
     let idx = 0;
+    let b = 0;
     const schedule = () => {
-      const t = ctx.currentTime + 0.03;
+      const t = ctx.currentTime + 0.04;
       for (let i = 0; i < 8; i++) {
         const f = melody[(idx + i) % melody.length];
-        tone(f, 0.18, 'sine', 0.018, t + i * 0.22);
+        tone(f, 0.2, 'sine', 0.035, t + i * 0.2);
       }
+      tone(bass[b % bass.length], 0.35, 'triangle', 0.03, t + 0.02);
+      tone(bass[(b + 1) % bass.length], 0.35, 'triangle', 0.03, t + 0.82);
       idx = (idx + 2) % melody.length;
+      b = (b + 1) % bass.length;
     };
     schedule();
     state.bgmTimer = setInterval(schedule, 1600);
@@ -439,6 +464,12 @@
     clickSfx();
     const c = centerOf(e.currentTarget); burst(c.x, c.y, '#22d3ee');
     setScreen('shop');
+  };
+
+  $('#audioFab').onclick = (e) => {
+    enableAudio();
+    const c = centerOf(e.currentTarget); burst(c.x, c.y, '#22d3ee');
+    toast('사운드 활성화 완료 🎵');
   };
 
   $('#soundToggle').onclick = (e) => {
