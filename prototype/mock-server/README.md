@@ -14,9 +14,11 @@ node server.mjs
 ## Endpoints
 
 - `GET /health`
+- `GET /api/player/state?uid=6702395893`
 - `GET /api/shop/catalog?uid=6702395893&country=KR&city=Seoul&segment=default`
 - `POST /api/shop/purchase/verify`
 - `POST /api/economy/offline/claim`
+- `POST /api/game/session/finish`
 - `GET /api/rankings?scope=country&period=weekly&type=skill`
 - `POST /api/rankings/submit`
 - `GET /api/missions/daily?uid=6702395893`

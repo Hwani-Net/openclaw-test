@@ -254,6 +254,7 @@
       <span class="chip">무료캐시 <b id="walletFree">0</b></span>
       <span class="chip">유료캐시 <b id="walletPaid">0</b></span>
       <span class="chip">baseRPM <b id="baseRpm">0</b></span>
+      <span class="chip">데이터 <b id="dataMode">LOCAL</b></span>
     </div>
 
     <div class="hud-grid">
@@ -334,6 +335,9 @@
   resizeFx(); addEventListener('resize', resizeFx);
 
   const state = {
+    uid: '6702395893',
+    apiBase: new URLSearchParams(location.search).get('api') || '',
+    apiOnline: false,
     wallet: null,
     running: false,
     paused: false,
@@ -369,13 +373,43 @@
   function defaultWallet(){
     return { gold:128550, freeCash:480, paidCash:120, baseRPM:185, lastSeenAtMs: now() - 3 * 3600 * 1000 };
   }
-  function loadWallet(){
+
+  function hasApi(){ return !!state.apiBase; }
+
+  async function apiFetch(path, options = {}) {
+    if (!state.apiBase) throw new Error('NO_API_BASE');
+    const url = `${state.apiBase.replace(/\/$/, '')}${path}`;
+    const res = await fetch(url, options);
+    if (!res.ok) throw new Error(`API_${res.status}`);
+    return res.json();
+  }
+
+  async function loadWallet(){
+    if (hasApi()) {
+      try {
+        const r = await apiFetch(`/api/player/state?uid=${encodeURIComponent(state.uid)}`);
+        state.apiOnline = true;
+        return {
+          ...defaultWallet(),
+          ...r.wallet,
+          baseRPM: r.baseRPM ?? 185,
+          lastSeenAtMs: r.lastSeenAtMs ?? now()
+        };
+      } catch {
+        state.apiOnline = false;
+        // fallback to local cache
+      }
+    }
+
     try {
       const v = JSON.parse(localStorage.getItem(WALLET_KEY) || 'null');
       return v && typeof v === 'object' ? { ...defaultWallet(), ...v } : defaultWallet();
     } catch { return defaultWallet(); }
   }
-  function saveWallet(){ localStorage.setItem(WALLET_KEY, JSON.stringify(state.wallet)); }
+
+  function saveWallet(){
+    if (!hasApi()) localStorage.setItem(WALLET_KEY, JSON.stringify(state.wallet));
+  }
 
   function toast(msg){
     const el = $('#toast');
@@ -423,6 +457,7 @@
     $('#walletFree').textContent = state.wallet.freeCash.toLocaleString();
     $('#walletPaid').textContent = state.wallet.paidCash.toLocaleString();
     $('#baseRpm').textContent = state.wallet.baseRPM;
+    $('#dataMode').textContent = hasApi() ? (state.apiOnline ? 'API' : 'FALLBACK') : 'LOCAL';
 
     $('#timeLeft').textContent = Math.max(0, Math.ceil(state.leftMs / 1000));
     $('#runGold').textContent = state.runGold.toLocaleString();
@@ -583,16 +618,68 @@
 
   function decay(min){ if(min <= 120) return 1; if(min <= 480) return .6; return .25; }
 
-  function tryOfflineReward(){
+  async function tryOfflineReward(){
+    let min = 0;
+    let d = 1;
+    let g = 0;
+    let f = 0;
+
+    if (hasApi()) {
+      try {
+        const n = now();
+        min = Math.min(1440, Math.max(0, Math.floor((n - state.wallet.lastSeenAtMs) / 60000)));
+        if (min < 5) return;
+
+        d = decay(min);
+        g = Math.floor(state.wallet.baseRPM * min * d);
+        f = Math.min(40, Math.floor(min / 30));
+
+        $('#ovTitle').textContent = '오프라인 수익 도착';
+        $('#ovDesc').innerHTML =           `미접속 ${min}분 / 감쇠 ${d}<br>골드 +${g.toLocaleString()} / 무료캐시 +${f}`;
+        $('#overlay').classList.add('show');
+        $('#ovBtn').textContent = '무료 수령';
+
+        $('#ovBtn').onclick = async () => {
+          try {
+            const r = await apiFetch('/api/economy/offline/claim', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ uid: state.uid, claimType: 'free', lastSeenAtMs: state.wallet.lastSeenAtMs })
+            });
+            state.apiOnline = true;
+            state.wallet = {
+              ...state.wallet,
+              ...r.wallet,
+              baseRPM: r.baseRPM ?? state.wallet.baseRPM,
+              lastSeenAtMs: r.lastSeenAtMs ?? now()
+            };
+            $('#overlay').classList.remove('show');
+            $('#ovBtn').textContent = '확인';
+            bindOverlayDefault();
+            updateHUD();
+            toast('오프라인 보상 수령');
+            playSfx('serve');
+          } catch {
+            state.apiOnline = false;
+            toast('오프라인 수령 실패');
+          }
+        };
+        return;
+      } catch {
+        state.apiOnline = false;
+        // fallback below
+      }
+    }
+
     const n = now();
-    const min = Math.min(1440, Math.max(0, Math.floor((n - state.wallet.lastSeenAtMs) / 60000)));
+    min = Math.min(1440, Math.max(0, Math.floor((n - state.wallet.lastSeenAtMs) / 60000)));
     if (min < 5) return;
-    const d = decay(min);
-    const g = Math.floor(state.wallet.baseRPM * min * d);
-    const f = Math.min(40, Math.floor(min / 30));
+    d = decay(min);
+    g = Math.floor(state.wallet.baseRPM * min * d);
+    f = Math.min(40, Math.floor(min / 30));
 
     $('#ovTitle').textContent = '오프라인 수익 도착';
-    $('#ovDesc').innerHTML = `미접속 ${min}분 / 감쇠 ${d}<br>골드 +${g.toLocaleString()} / 무료캐시 +${f}`;
+    $('#ovDesc').innerHTML =       `미접속 ${min}분 / 감쇠 ${d}<br>골드 +${g.toLocaleString()} / 무료캐시 +${f}`;
     $('#overlay').classList.add('show');
     $('#ovBtn').textContent = '무료 수령';
     $('#ovBtn').onclick = () => {
@@ -622,12 +709,47 @@
     state.paused = false;
     state.ended = true;
 
-    state.wallet.gold += state.runGold;
-    const playedMin = Math.max(1, (state.totalMs - state.leftMs) / 60000);
-    const perMin = state.runGold / playedMin;
-    state.wallet.baseRPM = Math.max(80, Math.round(state.wallet.baseRPM * 0.8 + perMin * 0.2));
-    state.wallet.lastSeenAtMs = now();
-    saveWallet();
+    const playedMs = Math.max(1000, (state.totalMs - state.leftMs));
+
+    if (hasApi()) {
+      apiFetch('/api/game/session/finish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: state.uid,
+          runGold: state.runGold,
+          playedMs,
+          served: state.served,
+          missed: state.missed
+        })
+      }).then((r) => {
+        state.apiOnline = true;
+        state.wallet = {
+          ...state.wallet,
+          ...r.wallet,
+          baseRPM: r.baseRPM ?? state.wallet.baseRPM,
+          lastSeenAtMs: r.lastSeenAtMs ?? now()
+        };
+        updateHUD();
+      }).catch(() => {
+        state.apiOnline = false;
+        // fallback local update on API failure
+        state.wallet.gold += state.runGold;
+        const playedMin = Math.max(1, playedMs / 60000);
+        const perMin = state.runGold / playedMin;
+        state.wallet.baseRPM = Math.max(80, Math.round(state.wallet.baseRPM * 0.8 + perMin * 0.2));
+        state.wallet.lastSeenAtMs = now();
+        saveWallet();
+        updateHUD();
+      });
+    } else {
+      state.wallet.gold += state.runGold;
+      const playedMin = Math.max(1, playedMs / 60000);
+      const perMin = state.runGold / playedMin;
+      state.wallet.baseRPM = Math.max(80, Math.round(state.wallet.baseRPM * 0.8 + perMin * 0.2));
+      state.wallet.lastSeenAtMs = now();
+      saveWallet();
+    }
 
     $('#ovTitle').textContent = reason;
     $('#ovDesc').innerHTML = `획득 골드: <b>${state.runGold.toLocaleString()}</b><br>서빙 ${state.served} / 실패 ${state.missed}<br>baseRPM 갱신: ${state.wallet.baseRPM}`;
@@ -861,14 +983,16 @@
   });
 
   // -------- Boot --------
-  state.wallet = loadWallet();
-  updateHUD();
-  renderCustomers();
-  renderStations();
-  renderTray();
-  bindOverlayDefault();
-  tryOfflineReward();
-  requestAnimationFrame(loop);
+  (async function init(){
+    state.wallet = await loadWallet();
+    updateHUD();
+    renderCustomers();
+    renderStations();
+    renderTray();
+    bindOverlayDefault();
+    await tryOfflineReward();
+    requestAnimationFrame(loop);
+  })();
 })();
 </script>
 </body>

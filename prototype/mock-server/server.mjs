@@ -120,6 +120,19 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    if (method === 'GET' && u.pathname === '/api/player/state') {
+      const uid = u.searchParams.get('uid') || 'guest';
+      const user = getUser(uid);
+      return send(res, 200, {
+        ok: true,
+        uid,
+        wallet: user.wallet,
+        baseRPM: user.baseRPM,
+        lastSeenAtMs: user.lastSeenAtMs,
+        serverTime: Date.now()
+      });
+    }
+
     if (method === 'GET' && u.pathname === '/api/shop/catalog') {
       return send(res, 200, {
         ok: true,
@@ -204,8 +217,45 @@ const server = http.createServer(async (req, res) => {
         claimType,
         rewards: { gold, freeCash },
         wallet: user.wallet,
+        baseRPM: user.baseRPM,
+        lastSeenAtMs: user.lastSeenAtMs,
         remainingStorage: 0,
         serverTime: now
+      });
+    }
+
+    if (method === 'POST' && u.pathname === '/api/game/session/finish') {
+      const body = await parseBody(req);
+      const {
+        uid = 'guest',
+        runGold = 0,
+        playedMs = 60000,
+        served = 0,
+        missed = 0
+      } = body;
+
+      const user = getUser(uid);
+      const runGoldNum = Math.max(0, Number(runGold) || 0);
+      const playedMin = Math.max(1, (Number(playedMs) || 60000) / 60000);
+      const perMin = runGoldNum / playedMin;
+
+      user.wallet.gold += runGoldNum;
+      user.baseRPM = Math.max(80, Math.round(user.baseRPM * 0.8 + perMin * 0.2));
+      user.lastSeenAtMs = Date.now();
+
+      return send(res, 200, {
+        ok: true,
+        uid,
+        summary: {
+          runGold: runGoldNum,
+          served: Number(served) || 0,
+          missed: Number(missed) || 0,
+          playedMs: Number(playedMs) || 0
+        },
+        wallet: user.wallet,
+        baseRPM: user.baseRPM,
+        lastSeenAtMs: user.lastSeenAtMs,
+        serverTime: Date.now()
       });
     }
 
