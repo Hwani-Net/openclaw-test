@@ -6,63 +6,63 @@
   <title>Street Booth Tycoon - UX Prototype</title>
   <style>
     :root{
-      --bg:#070b1a; --bg2:#0f172a; --card:rgba(15,23,42,.78); --line:rgba(148,163,184,.35);
-      --text:#e2e8f0; --muted:#94a3b8; --cyan:#22d3ee; --pink:#f472b6; --green:#22c55e; --yellow:#f59e0b;
+      --bg:#fff7fb; --bg2:#eef9ff; --card:rgba(255,255,255,.92); --line:rgba(244,114,182,.25);
+      --text:#334155; --muted:#64748b; --cyan:#22d3ee; --pink:#f472b6; --green:#22c55e; --yellow:#f59e0b;
     }
     *{box-sizing:border-box}
-    body{margin:0;background:radial-gradient(1200px 700px at 20% -20%,#06b6d433,transparent 50%),linear-gradient(180deg,var(--bg2),var(--bg));color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-    .phone{width:min(430px,100vw);height:100vh;margin:0 auto;display:flex;flex-direction:column;border-left:1px solid #1e293b;border-right:1px solid #1e293b;background:linear-gradient(180deg,rgba(2,6,23,.65),rgba(2,6,23,.92));overflow:hidden}
-    .top{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid #1e293b;background:rgba(2,6,23,.6)}
+    body{margin:0;background:radial-gradient(1000px 500px at 10% -10%,#fbcfe8aa,transparent 45%),radial-gradient(900px 600px at 110% 20%,#bae6fdaa,transparent 40%),linear-gradient(180deg,var(--bg2),var(--bg));color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+    .phone{width:min(430px,100vw);height:100vh;margin:0 auto;display:flex;flex-direction:column;border-left:1px solid #fbcfe8;border-right:1px solid #fbcfe8;background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.72));overflow:hidden;box-shadow:0 12px 40px rgba(236,72,153,.15)}
+    .top{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid #fbcfe8;background:rgba(255,255,255,.8)}
     .wallet{display:flex;gap:6px;flex-wrap:wrap}
-    .chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:5px 9px;background:rgba(15,23,42,.72)}
-    .chip b{color:#f8fafc}
-    .shop-btn{border:1px solid rgba(34,211,238,.6);background:rgba(34,211,238,.12);color:#a5f3fc;border-radius:10px;padding:8px 10px;font-weight:700}
+    .chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:5px 9px;background:#fff7fb}
+    .chip b{color:#0f172a}
+    .shop-btn{border:1px solid #f472b6;background:linear-gradient(180deg,#f9a8d4,#f472b6);color:#fff;border-radius:12px;padding:8px 10px;font-weight:800;box-shadow:0 6px 16px rgba(236,72,153,.25)}
 
     .content{flex:1;overflow:auto;padding:12px}
     .screen{display:none;gap:10px}
     .screen.active{display:grid}
 
-    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;backdrop-filter:blur(6px)}
-    .title{font-weight:800;letter-spacing:.02em}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;backdrop-filter:blur(6px);box-shadow:0 8px 22px rgba(236,72,153,.08)}
+    .title{font-weight:900;letter-spacing:.01em}
     .sub{font-size:12px;color:var(--muted)}
 
-    .hero{height:120px;border-radius:12px;background:linear-gradient(120deg,#0ea5e933,#a855f733),linear-gradient(180deg,#111827,#0f172a);display:flex;align-items:flex-end;padding:10px}
-    .hero .title{font-size:18px}
+    .hero{height:120px;border-radius:14px;background:linear-gradient(120deg,#fbcfe8,#bae6fd);display:flex;align-items:flex-end;padding:10px;border:1px solid #f9a8d4}
+    .hero .title{font-size:18px;color:#be185d}
 
     .offline{display:flex;justify-content:space-between;align-items:center;gap:8px}
-    .btn{border:1px solid var(--line);background:#111827;color:var(--text);border-radius:10px;padding:8px 10px;font-weight:700}
-    .btn.primary{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.6);color:#bbf7d0}
-    .btn.cyan{background:rgba(34,211,238,.15);border-color:rgba(34,211,238,.6);color:#a5f3fc}
+    .btn{border:1px solid #cbd5e1;background:#ffffff;color:#334155;border-radius:12px;padding:8px 10px;font-weight:800}
+    .btn.primary{background:linear-gradient(180deg,#86efac,#4ade80);border-color:#4ade80;color:#14532d}
+    .btn.cyan{background:linear-gradient(180deg,#67e8f9,#22d3ee);border-color:#22d3ee;color:#0e7490}
 
     .tabs{display:flex;gap:6px;overflow:auto;padding-bottom:2px}
-    .tab{flex:0 0 auto;font-size:12px;padding:7px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:#0b1225}
-    .tab.active{color:#0f172a;background:#67e8f9;border-color:#67e8f9;font-weight:800}
+    .tab{flex:0 0 auto;font-size:12px;padding:7px 10px;border-radius:999px;border:1px solid #fbcfe8;color:#7c3aed;background:#fff}
+    .tab.active{color:#fff;background:linear-gradient(180deg,#f472b6,#ec4899);border-color:#ec4899;font-weight:800}
 
-    .sku{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px;border-radius:12px;border:1px solid #334155;background:#0b1225}
-    .sku .name{font-weight:800}
-    .tag{font-size:10px;padding:2px 6px;border-radius:999px;border:1px solid #334155;color:#cbd5e1}
-    .tag.hot{color:#fef3c7;border-color:#f59e0b;background:#f59e0b22}
-    .tag.best{color:#cffafe;border-color:#22d3ee;background:#22d3ee22}
-    .buy{align-self:center;border:1px solid rgba(34,211,238,.6);background:#22d3ee22;color:#a5f3fc;border-radius:10px;padding:8px 9px;font-weight:800}
+    .sku{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px;border-radius:14px;border:1px solid #fbcfe8;background:#fff}
+    .sku .name{font-weight:900;color:#0f172a}
+    .tag{font-size:10px;padding:2px 6px;border-radius:999px;border:1px solid #fbcfe8;color:#be185d}
+    .tag.hot{color:#9a3412;border-color:#fdba74;background:#fed7aa}
+    .tag.best{color:#0f766e;border-color:#67e8f9;background:#cffafe}
+    .buy{align-self:center;border:1px solid #22d3ee;background:linear-gradient(180deg,#a5f3fc,#67e8f9);color:#0e7490;border-radius:12px;padding:8px 9px;font-weight:900}
 
     .rank-head{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .select{padding:8px;border-radius:10px;background:#0b1225;color:#e2e8f0;border:1px solid #334155;font-weight:700}
+    .select{padding:8px;border-radius:12px;background:#fff;color:#334155;border:1px solid #fbcfe8;font-weight:700}
     table{width:100%;border-collapse:collapse;font-size:13px}
-    th,td{padding:8px;border-bottom:1px solid #1f2937;text-align:left}
-    th{color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+    th,td{padding:8px;border-bottom:1px solid #fce7f3;text-align:left}
+    th{color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
 
-    .bottom{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #1e293b;background:#020617}
-    .nav{border:none;background:transparent;color:#64748b;padding:10px 6px;font-weight:700}
-    .nav.active{color:#a5f3fc}
+    .bottom{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #fbcfe8;background:#fff}
+    .nav{border:none;background:transparent;color:#94a3b8;padding:10px 6px;font-weight:800}
+    .nav.active{color:#db2777}
 
-    .modal,.sheet{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,.65);z-index:20}
+    .modal,.sheet{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.35);z-index:20}
     .modal.show,.sheet.show{display:flex}
-    .box{width:min(360px,92vw);background:#0b1225;border:1px solid #334155;border-radius:16px;padding:14px}
+    .box{width:min(360px,92vw);background:#fff;border:1px solid #fbcfe8;border-radius:16px;padding:14px}
     .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 
     .sheet{align-items:flex-end}
-    .panel{width:min(430px,100vw);background:#0b1225;border-top-left-radius:18px;border-top-right-radius:18px;border:1px solid #334155;padding:14px}
-    .line{display:flex;justify-content:space-between;margin:6px 0;color:#cbd5e1}
+    .panel{width:min(430px,100vw);background:#fff;border-top-left-radius:18px;border-top-right-radius:18px;border:1px solid #fbcfe8;padding:14px}
+    .line{display:flex;justify-content:space-between;margin:6px 0;color:#334155}
   </style>
 </head>
 <body>
@@ -80,7 +80,7 @@
       <section class="screen active" id="screen-home">
         <div class="hero card">
           <div>
-            <div class="title">포장마차 타이쿤</div>
+            <div class="title">🍡 포차팡 타이쿤</div>
             <div class="sub">오늘 매출 2,930,000원 · 친구랭킹 14위</div>
           </div>
         </div>
@@ -192,7 +192,7 @@
   function toast(msg){
     const el = document.createElement('div');
     el.textContent = msg;
-    Object.assign(el.style,{position:'fixed',left:'50%',top:'72px',transform:'translateX(-50%)',background:'#22d3ee22',color:'#a5f3fc',border:'1px solid #22d3ee99',padding:'8px 11px',borderRadius:'999px',fontWeight:'700',zIndex:50});
+    Object.assign(el.style,{position:'fixed',left:'50%',top:'72px',transform:'translateX(-50%)',background:'#fff',color:'#db2777',border:'1px solid #f9a8d4',padding:'8px 11px',borderRadius:'999px',fontWeight:'800',zIndex:50,boxShadow:'0 8px 18px rgba(236,72,153,.2)'});
     document.body.appendChild(el);
     setTimeout(()=>el.remove(),900);
   }
