@@ -57,6 +57,11 @@
       font-size: 22px;
       font-weight: 700;
     }
+    .value.rank {
+      font-size: 18px;
+      color: #fbbf24;
+      text-shadow: 0 0 14px rgba(251, 191, 36, .25);
+    }
     .row {
       display: flex;
       justify-content: space-between;
@@ -118,6 +123,7 @@
       <div class="title">Mission</div>
       <div class="value" id="score">0</div>
       <div class="row"><span>Best</span><b id="best">0</b></div>
+      <div class="row"><span>Rank</span><b id="rankName">Cadet</b></div>
       <div class="row"><span>Checkpoints Left</span><b id="left">0</b></div>
     </div>
     <div class="panel">
@@ -125,6 +131,13 @@
       <div class="row"><span>Speed</span><b id="speed">0</b></div>
       <div class="row"><span>Altitude</span><b id="alt">0</b></div>
       <div class="row"><span>Throttle</span><b id="throttle">0%</b></div>
+    </div>
+    <div class="panel">
+      <div class="title">Leaderboard</div>
+      <div class="value rank" id="rankTier">Cadet</div>
+      <div class="row"><span>#1</span><b id="lb1">0</b></div>
+      <div class="row"><span>#2</span><b id="lb2">0</b></div>
+      <div class="row"><span>#3</span><b id="lb3">0</b></div>
     </div>
   </div>
 
@@ -142,13 +155,35 @@
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
 
+  function loadLeaderboard() {
+    try {
+      const raw = JSON.parse(localStorage.getItem('sky-rush-leaderboard') || '[]');
+      if (!Array.isArray(raw)) return [0, 0, 0];
+      const list = raw
+        .map(Number)
+        .filter((n) => Number.isFinite(n) && n >= 0)
+        .map((n) => Math.floor(n))
+        .sort((a, b) => b - a)
+        .slice(0, 3);
+      while (list.length < 3) list.push(0);
+      return list;
+    } catch {
+      return [0, 0, 0];
+    }
+  }
+
   const ui = {
     score: document.getElementById('score'),
     best: document.getElementById('best'),
+    rankName: document.getElementById('rankName'),
+    rankTier: document.getElementById('rankTier'),
     left: document.getElementById('left'),
     speed: document.getElementById('speed'),
     alt: document.getElementById('alt'),
     throttle: document.getElementById('throttle'),
+    lb1: document.getElementById('lb1'),
+    lb2: document.getElementById('lb2'),
+    lb3: document.getElementById('lb3'),
     notice: document.getElementById('notice')
   };
 
@@ -162,16 +197,45 @@
     throttle: 62,
     score: 0,
     best: Number(localStorage.getItem('sky-rush-best') || 0),
+    bestList: loadLeaderboard(),
     rings: [],
     stars: [],
     hills: []
   };
+
+  state.best = Math.max(state.best, state.bestList[0] || 0);
 
   function showNotice(text) {
     ui.notice.textContent = text;
     ui.notice.classList.add('show');
     clearTimeout(showNotice.t);
     showNotice.t = setTimeout(() => ui.notice.classList.remove('show'), 850);
+  }
+
+  function getRankName(score) {
+    if (score >= 50) return 'Mythic Pilot';
+    if (score >= 30) return 'Legend';
+    if (score >= 20) return 'Squadron Leader';
+    if (score >= 12) return 'Ace';
+    if (score >= 5) return 'Pilot';
+    return 'Cadet';
+  }
+
+  function finalizeRun() {
+    if (state.score <= 0) return;
+
+    state.bestList.push(state.score);
+    state.bestList = state.bestList
+      .map((n) => Math.floor(Number(n) || 0))
+      .filter((n) => n >= 0)
+      .sort((a, b) => b - a)
+      .slice(0, 3);
+
+    while (state.bestList.length < 3) state.bestList.push(0);
+
+    state.best = Math.max(state.best, state.score, state.bestList[0] || 0);
+    localStorage.setItem('sky-rush-best', String(state.best));
+    localStorage.setItem('sky-rush-leaderboard', JSON.stringify(state.bestList));
   }
 
   function resize() {
@@ -428,8 +492,7 @@
 
     // Ground hit
     if (state.y < 8) {
-      state.best = Math.max(state.best, state.score);
-      localStorage.setItem('sky-rush-best', state.best);
+      finalizeRun();
       showNotice('충돌! 재시작');
       resetFlight(true);
       return;
@@ -484,8 +547,14 @@
     ctx.fill();
 
     // HUD updates
+    const rankName = getRankName(state.score);
     ui.score.textContent = state.score;
     ui.best.textContent = state.best;
+    ui.rankName.textContent = rankName;
+    ui.rankTier.textContent = rankName;
+    ui.lb1.textContent = state.bestList[0] ?? 0;
+    ui.lb2.textContent = state.bestList[1] ?? 0;
+    ui.lb3.textContent = state.bestList[2] ?? 0;
     ui.speed.textContent = `${Math.round(state.speed)} kt`;
     ui.alt.textContent = `${Math.max(0, Math.round(state.y))} m`;
     ui.throttle.textContent = `${Math.round(state.throttle)}%`;
@@ -504,8 +573,7 @@
   addEventListener('keydown', (e) => {
     keys.add(e.code);
     if (e.code === 'KeyR') {
-      state.best = Math.max(state.best, state.score);
-      localStorage.setItem('sky-rush-best', state.best);
+      finalizeRun();
       resetFlight(true);
       showNotice('리셋 완료');
     }
