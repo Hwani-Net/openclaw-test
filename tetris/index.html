@@ -60,7 +60,7 @@
     .topbar {
       width: 100%;
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 8px;
     }
 
@@ -122,6 +122,25 @@
       display: block;
       background: linear-gradient(180deg, #0a1020, #060b16);
       border: 1px solid rgba(148, 163, 184, .25);
+    }
+
+    .mode-row {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .select {
+      width: 100%;
+      border: 1px solid rgba(148, 163, 184, .45);
+      background: linear-gradient(180deg, rgba(30, 41, 59, .95), rgba(15, 23, 42, .95));
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-weight: 700;
+      letter-spacing: .02em;
+      outline: none;
     }
 
     .controls {
@@ -206,7 +225,7 @@
     @media (max-width: 979px) {
       .app { grid-template-columns: 1fr; padding: 8px; }
       .stage-wrap { grid-template-columns: 76px 1fr 76px; }
-      .topbar { grid-template-columns: repeat(2, 1fr); }
+      .topbar { grid-template-columns: repeat(3, 1fr); }
       .controls { grid-template-columns: repeat(2, 1fr); }
       canvas#board { max-width: min(86vw, 360px); }
     }
@@ -223,7 +242,9 @@
         <div class="card"><div class="k">Score</div><div class="v" id="score">0</div></div>
         <div class="card"><div class="k">Level</div><div class="v" id="level">1</div></div>
         <div class="card"><div class="k">Lines</div><div class="v" id="lines">0</div></div>
+        <div class="card"><div class="k">Combo</div><div class="v" id="combo">x0</div></div>
         <div class="card"><div class="k">High</div><div class="v" id="high">0</div></div>
+        <div class="card"><div class="k">Timer</div><div class="v" id="timer">00:00</div></div>
       </div>
 
       <div class="stage-wrap">
@@ -246,6 +267,14 @@
         </div>
       </div>
 
+      <div class="mode-row">
+        <select class="select" id="modeSelect">
+          <option value="classic">CLASSIC (무한)</option>
+          <option value="sprint">SPRINT (40줄)</option>
+          <option value="ultra">ULTRA (2분)</option>
+        </select>
+      </div>
+
       <div class="controls">
         <button class="btn" id="btnPause">일시정지</button>
         <button class="btn danger" id="btnRestart">새 게임</button>
@@ -263,7 +292,8 @@
       </div>
 
       <div class="hint">
-        ←/→ 이동 · ↓ 소프트드롭 · Space 하드드롭 · ↑/X 회전 · Z 반시계 · C 홀드 · P 일시정지
+        ←/→ 이동 · ↓ 소프트드롭 · Space 하드드롭 · ↑/X 회전 · Z 반시계 · C 홀드 · P 일시정지<br>
+        콤보/백투백 보너스 적용 · 모드별 기록 분리 저장
       </div>
     </div>
 
@@ -305,12 +335,19 @@
     score: document.getElementById('score'),
     level: document.getElementById('level'),
     lines: document.getElementById('lines'),
+    combo: document.getElementById('combo'),
     high: document.getElementById('high'),
+    timer: document.getElementById('timer'),
+    modeSelect: document.getElementById('modeSelect'),
     toast: document.getElementById('toast'),
     btnPause: document.getElementById('btnPause'),
     btnRestart: document.getElementById('btnRestart'),
     mobilePad: document.getElementById('mobilePad')
   };
+
+  function highKey(mode) {
+    return `neon-tetris-high-${mode}`;
+  }
 
   const state = {
     board: [],
@@ -322,7 +359,17 @@
     score: 0,
     lines: 0,
     level: 1,
-    high: Number(localStorage.getItem('neon-tetris-high') || 0),
+    combo: -1,
+    b2b: false,
+    mode: 'classic',
+    modeHigh: {
+      classic: Number(localStorage.getItem(highKey('classic')) || 0),
+      sprint: Number(localStorage.getItem(highKey('sprint')) || 0),
+      ultra: Number(localStorage.getItem(highKey('ultra')) || 0)
+    },
+    high: 0,
+    elapsedMs: 0,
+    timeLimitMs: 120000,
     gameOver: false,
     paused: false,
     dropCounter: 0,
@@ -330,11 +377,32 @@
     lastTime: 0
   };
 
+  state.high = state.modeHigh[state.mode];
+
   function toast(text, ms = 850) {
     ui.toast.textContent = text;
     ui.toast.classList.add('show');
     clearTimeout(toast.t);
     toast.t = setTimeout(() => ui.toast.classList.remove('show'), ms);
+  }
+
+  function formatTime(ms) {
+    const sec = Math.max(0, Math.floor(ms / 1000));
+    const m = String(Math.floor(sec / 60)).padStart(2, '0');
+    const s = String(sec % 60).padStart(2, '0');
+    return `${m}:${s}`;
+  }
+
+  function saveHigh() {
+    state.modeHigh[state.mode] = Math.max(state.modeHigh[state.mode] || 0, state.score);
+    state.high = state.modeHigh[state.mode];
+    localStorage.setItem(highKey(state.mode), String(state.high));
+  }
+
+  function modeLabel(mode = state.mode) {
+    if (mode === 'sprint') return 'SPRINT';
+    if (mode === 'ultra') return 'ULTRA';
+    return 'CLASSIC';
   }
 
   function createBoard() {
@@ -377,13 +445,24 @@
     if (collide(state.board, p)) {
       state.gameOver = true;
       state.paused = false;
-      state.high = Math.max(state.high, state.score);
-      localStorage.setItem('neon-tetris-high', String(state.high));
+      saveHigh();
       toast('GAME OVER', 1600);
     }
   }
 
+  function applyModeSettings() {
+    state.high = state.modeHigh[state.mode] || 0;
+    if (state.mode === 'sprint') {
+      state.timeLimitMs = 0;
+    } else if (state.mode === 'ultra') {
+      state.timeLimitMs = 120000;
+    } else {
+      state.timeLimitMs = 0;
+    }
+  }
+
   function resetGame() {
+    applyModeSettings();
     state.board = createBoard();
     state.bag = [];
     state.queue = [];
@@ -393,13 +472,16 @@
     state.score = 0;
     state.lines = 0;
     state.level = 1;
+    state.combo = -1;
+    state.b2b = false;
+    state.elapsedMs = 0;
     state.dropCounter = 0;
     state.dropInterval = 900;
     state.gameOver = false;
     state.paused = false;
     spawnPiece();
     render();
-    toast('READY');
+    toast(`${modeLabel()} READY`);
   }
 
   function updateLevel() {
@@ -445,10 +527,36 @@
 
     if (lines > 0) {
       state.lines += lines;
-      state.score += SCORE_TABLE[lines] * state.level;
+
+      // base points
+      let gain = SCORE_TABLE[lines] * state.level;
+
+      // combo
+      state.combo += 1;
+      if (state.combo > 0) {
+        gain += state.combo * 50 * state.level;
+      }
+
+      // back-to-back for tetris
+      if (lines === 4) {
+        if (state.b2b) gain += 200 * state.level;
+        state.b2b = true;
+      } else {
+        state.b2b = false;
+      }
+
+      state.score += gain;
       updateLevel();
-      toast(lines === 4 ? 'TETRIS!' : `+${lines} LINE`);
+
+      if (lines === 4 && state.b2b) toast('B2B TETRIS!');
+      else if (lines === 4) toast('TETRIS!');
+      else if (state.combo > 0) toast(`COMBO x${state.combo + 1}`);
+      else toast(`+${lines} LINE`);
+    } else {
+      state.combo = -1;
     }
+
+    return lines;
   }
 
   function rotateMatrixCW(m) {
@@ -540,6 +648,7 @@
       state.current = pieceFromType(temp);
       if (collide(state.board, state.current)) {
         state.gameOver = true;
+        saveHigh();
         toast('GAME OVER', 1400);
       }
     }
@@ -551,8 +660,17 @@
     const p = state.current;
     merge(state.board, p);
     clearLines();
-    state.high = Math.max(state.high, state.score);
-    localStorage.setItem('neon-tetris-high', String(state.high));
+    saveHigh();
+
+    // mode win/finish conditions
+    if (state.mode === 'sprint' && state.lines >= 40) {
+      state.gameOver = true;
+      state.paused = false;
+      saveHigh();
+      toast('SPRINT CLEAR!', 1800);
+      return;
+    }
+
     spawnPiece();
   }
 
@@ -692,10 +810,16 @@
     drawMini(nextCanvas, nextCtx, state.queue[0]);
     drawMini(holdCanvas, holdCtx, state.hold);
 
+    const timerText = state.mode === 'ultra'
+      ? formatTime(Math.max(0, state.timeLimitMs - state.elapsedMs))
+      : formatTime(state.elapsedMs);
+
     ui.score.textContent = state.score;
     ui.level.textContent = state.level;
     ui.lines.textContent = state.lines;
+    ui.combo.textContent = state.combo >= 1 ? `x${state.combo + 1}` : 'x0';
     ui.high.textContent = state.high;
+    ui.timer.textContent = timerText;
 
     ui.btnPause.textContent = state.paused ? '재개' : '일시정지';
   }
@@ -705,6 +829,18 @@
     state.lastTime = time;
 
     if (!state.paused && !state.gameOver) {
+      state.elapsedMs += dt;
+
+      if (state.mode === 'ultra') {
+        if (state.elapsedMs >= state.timeLimitMs) {
+          state.elapsedMs = state.timeLimitMs;
+          state.gameOver = true;
+          state.paused = false;
+          saveHigh();
+          toast('ULTRA FINISH!', 1600);
+        }
+      }
+
       state.dropCounter += dt;
       if (state.dropCounter >= state.dropInterval) {
         state.dropCounter = 0;
@@ -755,6 +891,10 @@
 
   ui.btnPause.addEventListener('click', togglePause);
   ui.btnRestart.addEventListener('click', resetGame);
+  ui.modeSelect.addEventListener('change', () => {
+    state.mode = ui.modeSelect.value;
+    resetGame();
+  });
 
   ui.mobilePad.addEventListener('touchstart', (e) => {
     const btn = e.target.closest('.pad-btn');
@@ -770,10 +910,8 @@
   });
 
   // init
-  state.board = createBoard();
-  spawnPiece();
-  toast('NEON TETRIS');
-  render();
+  ui.modeSelect.value = state.mode;
+  resetGame();
   requestAnimationFrame(gameLoop);
 })();
 </script>
