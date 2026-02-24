@@ -35,14 +35,16 @@
       height: 100%;
       padding: 14px;
       gap: 14px;
+      overflow-y: auto;
     }
 
     .center {
       display: grid;
-      grid-template-rows: auto auto 1fr auto;
+      grid-template-rows: auto auto auto auto auto auto;
       gap: 10px;
       align-items: start;
       justify-items: center;
+      width: 100%;
     }
 
     .title {
@@ -224,10 +226,21 @@
 
     @media (max-width: 979px) {
       .app { grid-template-columns: 1fr; padding: 8px; }
-      .stage-wrap { grid-template-columns: 76px 1fr 76px; }
+      .center { gap: 8px; }
+      .stage-wrap { grid-template-columns: 64px 1fr 64px; gap: 8px; }
       .topbar { grid-template-columns: repeat(3, 1fr); }
       .controls { grid-template-columns: repeat(2, 1fr); }
-      canvas#board { max-width: min(86vw, 360px); }
+      .board-shell { padding: 8px; }
+      canvas#board { max-width: min(94vw, 420px); }
+      .hint { font-size: 11px; margin-top: 2px; }
+    }
+
+    @media (max-width: 520px) {
+      .stage-wrap { grid-template-columns: 56px 1fr 56px; gap: 6px; }
+      .topbar { grid-template-columns: repeat(2, 1fr); }
+      .card { padding: 7px 8px; }
+      .v { font-size: 16px; }
+      canvas#board { max-width: min(96vw, 460px); }
     }
   </style>
 </head>
