@@ -87,6 +87,7 @@
         <div class="chip">코인 <b>128,550</b></div>
         <div class="chip">무료캐시 <b>480</b></div>
         <div class="chip">유료캐시 <b>120</b></div>
+        <div class="chip" id="apiStatus">API <b>INIT</b></div>
       </div>
       <div class="top-actions">
         <button class="sound-btn" id="soundToggle">🔊</button>
@@ -205,6 +206,8 @@
     catalog: null,
     ranking: null,
     selectedSku: null,
+    apiBase: new URLSearchParams(location.search).get('api') || '',
+    apiOnline: false,
     audioReady: false,
     audioOn: true,
     audioCtx: null,
@@ -217,6 +220,27 @@
 
   const $ = (q) => document.querySelector(q);
   const $$ = (q) => [...document.querySelectorAll(q)];
+
+  function setApiStatus(text, tone = 'INIT') {
+    const el = $('#apiStatus b');
+    if (!el) return;
+    el.textContent = text;
+    const map = {
+      INIT: '#475569',
+      ONLINE: '#16a34a',
+      MOCK: '#db2777',
+      ERROR: '#dc2626'
+    };
+    el.style.color = map[tone] || '#475569';
+  }
+
+  async function apiFetch(path, options = {}) {
+    if (!state.apiBase) throw new Error('NO_API_BASE');
+    const url = `${state.apiBase.replace(/\/$/, '')}${path}`;
+    const res = await fetch(url, options);
+    if (!res.ok) throw new Error(`API_${res.status}`);
+    return res.json();
+  }
 
   document.addEventListener('pointerdown', (e) => {
     const t = e.target.closest('button,.tab,.buy,.nav,.select');
@@ -396,11 +420,34 @@
   }
 
   async function loadData(){
-    const [c,r] = await Promise.all([
-      fetch('./mock/catalog.json').then(v=>v.json()),
-      fetch('./mock/ranking.json').then(v=>v.json())
-    ]);
-    state.catalog = c; state.ranking = r;
+    try {
+      if (state.apiBase) {
+        const [health, c, rs, rb] = await Promise.all([
+          apiFetch('/health'),
+          apiFetch('/api/shop/catalog?uid=6702395893&country=KR&city=Seoul&segment=default'),
+          apiFetch('/api/rankings?scope=country&period=weekly&type=skill'),
+          apiFetch('/api/rankings?scope=country&period=weekly&type=business')
+        ]);
+
+        state.apiOnline = !!health?.ok;
+        state.catalog = c.tabs;
+        state.ranking = {
+          skill: { country: rs.rows || [] },
+          business: { country: rb.rows || [] }
+        };
+        setApiStatus('ONLINE', 'ONLINE');
+        return;
+      }
+      throw new Error('NO_API');
+    } catch {
+      const [c,r] = await Promise.all([
+        fetch('./mock/catalog.json').then(v=>v.json()),
+        fetch('./mock/ranking.json').then(v=>v.json())
+      ]);
+      state.catalog = c;
+      state.ranking = r;
+      setApiStatus('MOCK', 'MOCK');
+    }
   }
 
   function setScreen(name){
@@ -451,15 +498,30 @@
     });
   }
 
-  function pickRankRows(){
+  function pickRankRowsFallback(){
     const scope = $('#scopeSel').value;
     const type = $('#typeSel').value;
     const src = state.ranking?.[type] || {};
     return src[scope] || src.country || [];
   }
 
-  function renderRank(){
-    const rows = pickRankRows();
+  async function renderRank(){
+    let rows = [];
+    const scope = $('#scopeSel').value;
+    const type = $('#typeSel').value;
+
+    try {
+      if (state.apiBase) {
+        const r = await apiFetch(`/api/rankings?scope=${scope}&period=weekly&type=${type}`);
+        rows = r.rows || [];
+      } else {
+        rows = pickRankRowsFallback();
+      }
+    } catch {
+      rows = pickRankRowsFallback();
+      if (state.apiBase) setApiStatus('ERROR', 'ERROR');
+    }
+
     $('#rankBody').innerHTML = rows.map(r=>`<tr><td>${r.rank}</td><td>${r.name}</td><td>${Number(r.score).toLocaleString()}</td><td>${r.region}</td></tr>`).join('');
   }
 
@@ -514,12 +576,27 @@
     $('#offlineModal').classList.remove('show');
   };
 
-  $('#offConfirm').onclick = (e) => {
+  $('#offConfirm').onclick = async (e) => {
     unlockAudio();
     playHit();
     const c = centerOf(e.currentTarget); burst(c.x, c.y, '#22c55e');
     $('#offlineModal').classList.remove('show');
-    toast('오프라인 2배 수령 결제 완료');
+
+    try {
+      if (state.apiBase) {
+        const r = await apiFetch('/api/economy/offline/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: '6702395893', claimType: 'x2' })
+        });
+        toast(`2배 수령 완료 +${Number(r.rewards.gold).toLocaleString()}G`);
+      } else {
+        toast('오프라인 2배 수령 결제 완료');
+      }
+    } catch {
+      toast('수령 처리 실패 (재시도)');
+      setApiStatus('ERROR', 'ERROR');
+    }
   };
 
   $('#buyCancel').onclick = (e) => {
@@ -529,15 +606,37 @@
     $('#buySheet').classList.remove('show');
   };
 
-  $('#buyConfirm').onclick = (e) => {
+  $('#buyConfirm').onclick = async (e) => {
     unlockAudio();
     playHit();
     const c = centerOf(e.currentTarget);
     burst(c.x, c.y, '#22c55e');
     burst(c.x + 24, c.y - 12, '#f472b6');
     const name = state.selectedSku?.name || '상품';
+    const skuId = state.selectedSku?.id;
     $('#buySheet').classList.remove('show');
-    toast(`${name} 결제 완료`);
+
+    try {
+      if (state.apiBase && skuId) {
+        const r = await apiFetch('/api/shop/purchase/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: '6702395893',
+            skuId,
+            platform: 'web',
+            receipt: 'mock-receipt',
+            txId: `tx_${Date.now()}`
+          })
+        });
+        toast(`${name} 결제 완료 (+${r.walletDelta.freeCash || 0} 캐시)`);
+      } else {
+        toast(`${name} 결제 완료`);
+      }
+    } catch {
+      toast('결제 검증 실패 (재시도)');
+      setApiStatus('ERROR', 'ERROR');
+    }
   };
 
   $('#scopeSel').onchange = (e) => { unlockAudio(); clickSfx(); const c=centerOf(e.currentTarget); burst(c.x,c.y,'#f472b6'); renderRank(); };
