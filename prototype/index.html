@@ -16,7 +16,9 @@
     .wallet{display:flex;gap:6px;flex-wrap:wrap}
     .chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:5px 9px;background:#fff7fb}
     .chip b{color:#0f172a}
-    .shop-btn{border:1px solid #f472b6;background:linear-gradient(180deg,#f9a8d4,#f472b6);color:#fff;border-radius:12px;padding:8px 10px;font-weight:800;box-shadow:0 6px 16px rgba(236,72,153,.25)}
+    .top-actions{display:flex;gap:6px;align-items:center}
+    .shop-btn,.sound-btn{border:1px solid #f472b6;background:linear-gradient(180deg,#f9a8d4,#f472b6);color:#fff;border-radius:12px;padding:8px 10px;font-weight:800;box-shadow:0 6px 16px rgba(236,72,153,.25)}
+    .sound-btn{min-width:42px;padding:8px 9px;background:linear-gradient(180deg,#a5f3fc,#67e8f9);border-color:#22d3ee;color:#0e7490}
 
     .content{flex:1;overflow:auto;padding:12px}
     .screen{display:none;gap:10px}
@@ -63,6 +65,15 @@
     .sheet{align-items:flex-end}
     .panel{width:min(430px,100vw);background:#fff;border-top-left-radius:18px;border-top-right-radius:18px;border:1px solid #fbcfe8;padding:14px}
     .line{display:flex;justify-content:space-between;margin:6px 0;color:#334155}
+
+    .card,.sku,.btn,.buy,.tab,.nav,.shop-btn,.sound-btn{transition:transform .12s ease,box-shadow .2s ease,filter .2s ease}
+    .card{animation:floatIn .45s ease}
+    .btn:active,.buy:active,.tab:active,.nav:active,.shop-btn:active,.sound-btn:active{transform:scale(.97)}
+    .btn:hover,.buy:hover{filter:brightness(1.03)}
+
+    #fxCanvas{position:fixed;inset:0;pointer-events:none;z-index:60}
+
+    @keyframes floatIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
   </style>
 </head>
 <body>
@@ -73,7 +84,10 @@
         <div class="chip">무료캐시 <b>480</b></div>
         <div class="chip">유료캐시 <b>120</b></div>
       </div>
-      <button class="shop-btn" id="quickShop">SHOP</button>
+      <div class="top-actions">
+        <button class="sound-btn" id="soundToggle">🔊</button>
+        <button class="shop-btn" id="quickShop">SHOP</button>
+      </div>
     </div>
 
     <div class="content">
@@ -143,6 +157,8 @@
     </div>
   </div>
 
+  <canvas id="fxCanvas"></canvas>
+
   <div class="modal" id="offlineModal">
     <div class="box">
       <div class="title">오프라인 2배 수령</div>
@@ -183,11 +199,126 @@
     shopTab: 'recommended',
     catalog: null,
     ranking: null,
-    selectedSku: null
+    selectedSku: null,
+    audioReady: false,
+    audioOn: false,
+    audioCtx: null,
+    bgmTimer: null,
+    particles: []
   };
 
   const $ = (q) => document.querySelector(q);
   const $$ = (q) => [...document.querySelectorAll(q)];
+
+  const fxCanvas = $('#fxCanvas');
+  const fx = fxCanvas.getContext('2d');
+
+  function resizeFx(){
+    fxCanvas.width = innerWidth;
+    fxCanvas.height = innerHeight;
+  }
+  resizeFx();
+  addEventListener('resize', resizeFx);
+
+  function burst(x, y, color = '#f472b6') {
+    for (let i = 0; i < 24; i++) {
+      const a = (Math.PI * 2 * i) / 24 + Math.random() * 0.4;
+      const sp = 1.5 + Math.random() * 3.6;
+      state.particles.push({
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 1.4,
+        life: 34 + Math.random() * 20,
+        size: 2 + Math.random() * 3,
+        color
+      });
+    }
+  }
+
+  function tickFx(){
+    fx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.08;
+      p.life -= 1;
+      if (p.life <= 0) { state.particles.splice(i, 1); continue; }
+
+      fx.globalAlpha = Math.max(0, p.life / 50);
+      fx.fillStyle = p.color;
+      fx.beginPath();
+      fx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      fx.fill();
+    }
+    fx.globalAlpha = 1;
+    requestAnimationFrame(tickFx);
+  }
+  requestAnimationFrame(tickFx);
+
+  function ensureAudio(){
+    if (state.audioReady) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    state.audioCtx = new AC();
+    state.audioReady = true;
+  }
+
+  function unlockAudio(){
+    if (state.audioCtx && state.audioCtx.state === 'suspended') {
+      state.audioCtx.resume();
+    }
+  }
+
+  function tone(freq, dur = 0.08, type = 'triangle', vol = 0.05, at = null) {
+    if (!state.audioOn || !state.audioCtx) return;
+    const ctx = state.audioCtx;
+    const t0 = at ?? ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+
+  function playClick(){
+    tone(880, 0.06, 'triangle', 0.03);
+  }
+
+  function playHit(){
+    const t = state.audioCtx?.currentTime || 0;
+    tone(520, 0.08, 'square', 0.04, t);
+    tone(780, 0.11, 'triangle', 0.03, t + 0.02);
+  }
+
+  const melody = [523.25, 659.25, 783.99, 659.25, 587.33, 659.25, 698.46, 783.99];
+  function startCuteBgm(){
+    if (!state.audioOn || !state.audioCtx || state.bgmTimer) return;
+    const ctx = state.audioCtx;
+    let idx = 0;
+    const schedule = () => {
+      const t = ctx.currentTime + 0.03;
+      for (let i = 0; i < 8; i++) {
+        const f = melody[(idx + i) % melody.length];
+        tone(f, 0.18, 'sine', 0.018, t + i * 0.22);
+      }
+      idx = (idx + 2) % melody.length;
+    };
+    schedule();
+    state.bgmTimer = setInterval(schedule, 1600);
+  }
+
+  function stopCuteBgm(){
+    if (state.bgmTimer) {
+      clearInterval(state.bgmTimer);
+      state.bgmTimer = null;
+    }
+  }
 
   function toast(msg){
     const el = document.createElement('div');
@@ -195,6 +326,11 @@
     Object.assign(el.style,{position:'fixed',left:'50%',top:'72px',transform:'translateX(-50%)',background:'#fff',color:'#db2777',border:'1px solid #f9a8d4',padding:'8px 11px',borderRadius:'999px',fontWeight:'800',zIndex:50,boxShadow:'0 8px 18px rgba(236,72,153,.2)'});
     document.body.appendChild(el);
     setTimeout(()=>el.remove(),900);
+  }
+
+  function centerOf(el){
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
 
   async function loadData(){
@@ -217,7 +353,12 @@
   function renderShopTabs(){
     const box = $('#shopTabs');
     box.innerHTML = tabs.map(t=>`<button class="tab ${state.shopTab===t.key?'active':''}" data-tab="${t.key}">${t.label}</button>`).join('');
-    box.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{state.shopTab=b.dataset.tab;renderShop();});
+    box.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+      playClick();
+      const c = centerOf(b); burst(c.x, c.y, '#f472b6');
+      state.shopTab=b.dataset.tab;
+      renderShop();
+    });
   }
 
   function tagClass(tag=''){ return tag.toLowerCase()==='hot'?'hot':tag.toLowerCase()==='best'?'best':''; }
@@ -237,6 +378,8 @@
 
     $('#shopList').querySelectorAll('.buy').forEach(btn=>{
       btn.onclick = () => {
+        playClick();
+        const c = centerOf(btn); burst(c.x, c.y, '#22d3ee');
         state.selectedSku = list.find(x=>x.id===btn.dataset.id);
         $('#buyName').textContent = state.selectedSku.name;
         $('#buyDesc').textContent = state.selectedSku.desc;
@@ -259,22 +402,78 @@
   }
 
   // events
-  $$('.nav').forEach(n=>n.onclick=()=>setScreen(n.dataset.screen));
-  $('#quickShop').onclick = () => setScreen('shop');
+  $$('.nav').forEach(n=>n.onclick=()=>{
+    unlockAudio();
+    playClick();
+    const c = centerOf(n); burst(c.x, c.y, '#f472b6');
+    setScreen(n.dataset.screen);
+  });
 
-  $('#btnOffline2x').onclick = () => $('#offlineModal').classList.add('show');
-  $('#offCancel').onclick = () => $('#offlineModal').classList.remove('show');
-  $('#offConfirm').onclick = () => { $('#offlineModal').classList.remove('show'); toast('오프라인 2배 수령 결제 완료'); };
+  $('#quickShop').onclick = (e) => {
+    unlockAudio();
+    playClick();
+    const c = centerOf(e.currentTarget); burst(c.x, c.y, '#22d3ee');
+    setScreen('shop');
+  };
 
-  $('#buyCancel').onclick = () => $('#buySheet').classList.remove('show');
-  $('#buyConfirm').onclick = () => {
+  $('#soundToggle').onclick = (e) => {
+    ensureAudio();
+    unlockAudio();
+    state.audioOn = !state.audioOn;
+    e.currentTarget.textContent = state.audioOn ? '🔊' : '🔈';
+    const c = centerOf(e.currentTarget); burst(c.x, c.y, state.audioOn ? '#22d3ee' : '#f472b6');
+    if (state.audioOn) {
+      startCuteBgm();
+      playClick();
+      toast('사운드 ON 🎵');
+    } else {
+      stopCuteBgm();
+      toast('사운드 OFF');
+    }
+  };
+
+  $('#btnOffline2x').onclick = (e) => {
+    unlockAudio();
+    playClick();
+    const c = centerOf(e.currentTarget); burst(c.x, c.y, '#22d3ee');
+    $('#offlineModal').classList.add('show');
+  };
+
+  $('#offCancel').onclick = (e) => {
+    unlockAudio();
+    playClick();
+    const c = centerOf(e.currentTarget); burst(c.x, c.y, '#f9a8d4');
+    $('#offlineModal').classList.remove('show');
+  };
+
+  $('#offConfirm').onclick = (e) => {
+    unlockAudio();
+    playHit();
+    const c = centerOf(e.currentTarget); burst(c.x, c.y, '#22c55e');
+    $('#offlineModal').classList.remove('show');
+    toast('오프라인 2배 수령 결제 완료');
+  };
+
+  $('#buyCancel').onclick = (e) => {
+    unlockAudio();
+    playClick();
+    const c = centerOf(e.currentTarget); burst(c.x, c.y, '#f9a8d4');
+    $('#buySheet').classList.remove('show');
+  };
+
+  $('#buyConfirm').onclick = (e) => {
+    unlockAudio();
+    playHit();
+    const c = centerOf(e.currentTarget);
+    burst(c.x, c.y, '#22c55e');
+    burst(c.x + 24, c.y - 12, '#f472b6');
     const name = state.selectedSku?.name || '상품';
     $('#buySheet').classList.remove('show');
     toast(`${name} 결제 완료`);
   };
 
-  $('#scopeSel').onchange = renderRank;
-  $('#typeSel').onchange = renderRank;
+  $('#scopeSel').onchange = (e) => { unlockAudio(); playClick(); const c=centerOf(e.currentTarget); burst(c.x,c.y,'#f472b6'); renderRank(); };
+  $('#typeSel').onchange = (e) => { unlockAudio(); playClick(); const c=centerOf(e.currentTarget); burst(c.x,c.y,'#22d3ee'); renderRank(); };
 
   // bootstrap
   try {
