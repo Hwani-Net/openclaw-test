@@ -30,11 +30,14 @@
         radial-gradient(1200px 520px at 10% -10%, #0ea5e933, transparent 45%),
         radial-gradient(900px 620px at 110% 18%, #f9731630, transparent 40%),
         linear-gradient(180deg,var(--bg2),var(--bg1));
+      height:100dvh;
+      overflow:hidden;
     }
     .phone{
       width:min(440px,100vw);
       margin:0 auto;
-      min-height:100vh;
+      height:100dvh;
+      min-height:100dvh;
       border-left:1px solid #334155;
       border-right:1px solid #334155;
       background:linear-gradient(180deg,#111827ee,#0b1220f2);
@@ -44,7 +47,10 @@
       gap:8px;
       padding:10px;
       position:relative;
-      overflow:hidden;
+      overflow-y:auto;
+      overflow-x:hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
     }
     .card{
       background:var(--card);
@@ -307,9 +313,31 @@
     @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,211,238,.45)}70%{box-shadow:0 0 0 14px rgba(34,211,238,0)}100%{box-shadow:0 0 0 0 rgba(34,211,238,0)}}
 
     @media (max-width:460px){
-      .hud-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
-      .controls{grid-template-columns:1fr 1fr;}
-      .customers{grid-auto-columns:112px}
+      .phone{padding:8px;gap:6px;}
+      .card{padding:8px;border-radius:12px;}
+      .row{gap:6px;}
+      .title{font-size:14px;}
+      .muted{font-size:11px;}
+      .chip{font-size:11px;padding:3px 7px;}
+      .compact-hide{display:none;}
+      .topbar .top-btn{padding:6px 8px;min-width:38px;font-size:11px;}
+      .hud-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
+      .stat .v{font-size:15px;}
+      .customers{grid-auto-columns:104px;min-height:108px;padding-bottom:50px;}
+      .kitchen-grid,.tray-grid{gap:6px;}
+      .station,.cust{padding:7px;}
+      .controls{grid-template-columns:1fr 1fr;gap:6px;}
+      .btn{padding:9px 7px;font-size:12px;}
+      .status{font-size:11px;}
+    }
+
+    @media (max-height:740px){
+      .phone{gap:5px;padding:6px;}
+      .card{padding:7px;}
+      .customers{min-height:94px;padding-bottom:44px;}
+      .order-head{margin:22px 0 4px;}
+      .controls .btn{padding:8px 6px;}
+      .status{display:none;}
     }
   </style>
 </head>
@@ -331,8 +359,8 @@
       <span class="chip">골드 <b id="walletGold">0</b></span>
       <span class="chip">무료캐시 <b id="walletFree">0</b></span>
       <span class="chip">유료캐시 <b id="walletPaid">0</b></span>
-      <span class="chip">baseRPM <b id="baseRpm">0</b></span>
-      <span class="chip">데이터 <b id="dataMode">LOCAL</b></span>
+      <span class="chip compact-hide">baseRPM <b id="baseRpm">0</b></span>
+      <span class="chip compact-hide">데이터 <b id="dataMode">LOCAL</b></span>
     </div>
 
     <div class="hud-grid">
