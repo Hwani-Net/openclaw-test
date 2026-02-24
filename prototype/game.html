@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>포차팡 - 코어 게임 루프</title>
+  <style>
+    :root {
+      --bg: #fff8fb;
+      --bg2: #eefbff;
+      --card: rgba(255,255,255,.92);
+      --line: rgba(244,114,182,.3);
+      --text: #334155;
+      --muted: #64748b;
+      --pink: #ec4899;
+      --cyan: #22d3ee;
+      --green: #22c55e;
+      --orange: #fb923c;
+      --danger: #f43f5e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1000px 500px at 10% -15%, #fbcfe8aa, transparent 45%),
+        radial-gradient(900px 550px at 120% 20%, #bae6fdaa, transparent 40%),
+        linear-gradient(180deg, var(--bg2), var(--bg));
+    }
+    .phone {
+      width: min(430px, 100vw);
+      min-height: 100vh;
+      margin: 0 auto;
+      border-left: 1px solid #fbcfe8;
+      border-right: 1px solid #fbcfe8;
+      background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.76));
+      box-shadow: 0 12px 40px rgba(236,72,153,.12);
+      display: grid;
+      grid-template-rows: auto auto auto auto auto 1fr;
+      gap: 8px;
+      padding: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+    .row { display: flex; gap: 8px; }
+    .between { justify-content: space-between; align-items: center; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: 0 8px 20px rgba(236,72,153,.08);
+    }
+    .chip {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+    }
+    .title {
+      font-weight: 900;
+      color: #be185d;
+      letter-spacing: .02em;
+    }
+    .muted { color: var(--muted); font-size: 12px; }
+
+    .topbar .chip b { color: #0f172a; }
+
+    .hud-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+    .stat .v { font-weight: 900; font-size: 18px; margin-top: 2px; }
+
+    .orders {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 130px;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .order {
+      border: 1px solid #fbcfe8;
+      background: #fff;
+      border-radius: 12px;
+      padding: 8px;
+      min-height: 94px;
+      display: grid;
+      align-content: space-between;
+    }
+    .order .name { font-weight: 900; color: #0f172a; font-size: 14px; }
+    .bar {
+      width: 100%;
+      height: 7px;
+      border-radius: 999px;
+      background: #fce7f3;
+      overflow: hidden;
+      border: 1px solid #fbcfe8;
+    }
+    .bar > i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg,#22c55e,#facc15,#f43f5e); transform-origin: left center; }
+
+    .kitchen-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .recipe {
+      border: 1px solid #fbcfe8;
+      border-radius: 12px;
+      background: #fff;
+      padding: 8px;
+      text-align: left;
+      font-weight: 800;
+      color: #334155;
+    }
+    .recipe small { display: block; font-size: 11px; color: #64748b; margin-top: 2px; }
+    .recipe:disabled { opacity: .45; }
+
+    .cook-box {
+      border: 1px dashed #f9a8d4;
+      border-radius: 12px;
+      padding: 8px;
+      background: #fff;
+    }
+
+    .tray-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .serve {
+      border: 1px solid #bae6fd;
+      border-radius: 12px;
+      background: linear-gradient(180deg,#ecfeff,#cffafe);
+      color: #0e7490;
+      font-weight: 900;
+      padding: 9px 8px;
+    }
+    .serve:disabled { opacity: .45; }
+
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .btn {
+      border: 1px solid #f9a8d4;
+      background: #fff;
+      color: #334155;
+      border-radius: 12px;
+      padding: 10px;
+      font-weight: 900;
+    }
+    .btn.primary { background: linear-gradient(180deg,#f9a8d4,#f472b6); color: #fff; border-color: #f472b6; }
+    .btn.cyan { background: linear-gradient(180deg,#a5f3fc,#67e8f9); color: #0e7490; border-color: #22d3ee; }
+
+    .toast {
+      position: fixed;
+      left: 50%; top: 74px;
+      transform: translateX(-50%);
+      background: #fff;
+      border: 1px solid #f9a8d4;
+      border-radius: 999px;
+      padding: 7px 11px;
+      color: #db2777;
+      font-weight: 900;
+      box-shadow: 0 8px 18px rgba(236,72,153,.2);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .22s ease;
+      z-index: 40;
+    }
+    .toast.show { opacity: 1; }
+
+    .floating {
+      position: absolute;
+      font-weight: 900;
+      color: #16a34a;
+      text-shadow: 0 2px 8px rgba(34,197,94,.35);
+      pointer-events: none;
+      animation: floatUp .9s ease forwards;
+      z-index: 20;
+    }
+    .floating.bad { color: #e11d48; text-shadow: 0 2px 8px rgba(244,63,94,.35); }
+    @keyframes floatUp { from{transform:translateY(0);opacity:1} to{transform:translateY(-34px);opacity:0} }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15,23,42,.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+    }
+    .overlay.show { display: flex; }
+    .panel {
+      width: min(360px, 92vw);
+      background: #fff;
+      border: 1px solid #f9a8d4;
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 18px 40px rgba(15,23,42,.2);
+    }
+
+    @media (max-width: 460px){
+      .hud-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="phone" id="app">
+    <div class="row between topbar card">
+      <div class="title">🍡 포차팡 - 코어 루프</div>
+      <div class="row" style="flex-wrap:wrap;justify-content:flex-end">
+        <span class="chip">골드 <b id="walletGold">0</b></span>
+        <span class="chip">무료캐시 <b id="walletFree">0</b></span>
+        <span class="chip">유료캐시 <b id="walletPaid">0</b></span>
+      </div>
+    </div>
+
+    <div class="hud-grid">
+      <div class="card stat"><div class="k">Timer</div><div class="v" id="timer">90</div></div>
+      <div class="card stat"><div class="k">Run Coin</div><div class="v" id="runCoin">0</div></div>
+      <div class="card stat"><div class="k">Combo</div><div class="v" id="combo">x0</div></div>
+      <div class="card stat"><div class="k">Life</div><div class="v" id="life">❤️❤️❤️</div></div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><div class="title" style="color:#0f172a">주문 대기열</div><div class="muted">시간 내 서빙</div></div>
+      <div class="orders" id="orders"></div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><div class="title" style="color:#0f172a">조리</div><div class="muted">한 번에 1개 조리</div></div>
+      <div class="kitchen-grid" id="recipes"></div>
+      <div class="cook-box" style="margin-top:8px">
+        <div class="row between"><b id="cookName">대기중</b><span class="muted" id="cookTime">0.0s</span></div>
+        <div class="bar" style="margin-top:6px"><i id="cookBar" style="transform:scaleX(0)"></i></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><div class="title" style="color:#0f172a">트레이 & 서빙</div><div class="muted">같은 메뉴 주문에 서빙</div></div>
+      <div class="tray-grid" id="tray"></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn cyan" id="btnPause">일시정지</button>
+      <button class="btn primary" id="btnStart">게임 시작</button>
+    </div>
+
+    <div class="muted card" id="statusText">준비 완료. 게임 시작을 누르세요.</div>
+
+    <div class="overlay" id="overlay">
+      <div class="panel">
+        <div class="title" id="ovTitle">라운드 종료</div>
+        <div class="muted" id="ovDesc" style="margin-top:6px"></div>
+        <div class="row" style="margin-top:12px; justify-content:flex-end;">
+          <button class="btn primary" id="btnRestart">다시 시작</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const RECIPES = {
+    fish: { name: '붕어빵', emoji: '🐟', cookMs: 2400, reward: 180 },
+    hotteok: { name: '호떡', emoji: '🥞', cookMs: 3000, reward: 220 },
+    odeng: { name: '어묵', emoji: '🍢', cookMs: 1800, reward: 140 },
+    tteok: { name: '떡볶이', emoji: '🍜', cookMs: 3400, reward: 260 }
+  };
+
+  const RECIPE_KEYS = Object.keys(RECIPES);
+  const WALLET_KEY = 'ppocha_wallet_v1';
+
+  const $ = (q) => document.querySelector(q);
+  const ordersEl = $('#orders');
+  const recipesEl = $('#recipes');
+  const trayEl = $('#tray');
+
+  const state = {
+    wallet: null,
+    running: false,
+    paused: false,
+    ended: false,
+    gameMs: 90000,
+    leftMs: 90000,
+    lives: 3,
+    combo: 0,
+    runCoin: 0,
+    served: 0,
+    missed: 0,
+    orders: [],
+    orderSeq: 1,
+    spawnCd: 1300,
+    activeCook: null,
+    tray: { fish: 0, hotteok: 0, odeng: 0, tteok: 0 },
+    lastTs: 0,
+    audioCtx: null,
+    audioOn: true
+  };
+
+  function nowMs(){ return Date.now(); }
+
+  function defaultWallet(){
+    return {
+      gold: 128550,
+      freeCash: 480,
+      paidCash: 120,
+      baseRPM: 185,
+      lastSeenAtMs: nowMs() - 4 * 60 * 60 * 1000
+    };
+  }
+
+  function loadWallet(){
+    try {
+      const v = JSON.parse(localStorage.getItem(WALLET_KEY) || 'null');
+      return v && typeof v === 'object' ? { ...defaultWallet(), ...v } : defaultWallet();
+    } catch { return defaultWallet(); }
+  }
+
+  function saveWallet(){
+    localStorage.setItem(WALLET_KEY, JSON.stringify(state.wallet));
+  }
+
+  function toast(msg){
+    const el = $('#toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toast.t);
+    toast.t = setTimeout(() => el.classList.remove('show'), 900);
+  }
+
+  function floatText(text, x, y, bad = false){
+    const el = document.createElement('div');
+    el.className = `floating${bad ? ' bad' : ''}`;
+    el.textContent = text;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    $('#app').appendChild(el);
+    setTimeout(() => el.remove(), 900);
+  }
+
+  function formatMs(ms){ return Math.max(0, Math.ceil(ms / 1000)); }
+
+  function updateHUD(){
+    $('#walletGold').textContent = state.wallet.gold.toLocaleString();
+    $('#walletFree').textContent = state.wallet.freeCash.toLocaleString();
+    $('#walletPaid').textContent = state.wallet.paidCash.toLocaleString();
+    $('#timer').textContent = formatMs(state.leftMs);
+    $('#runCoin').textContent = state.runCoin.toLocaleString();
+    $('#combo').textContent = `x${state.combo}`;
+    $('#life').textContent = '❤️'.repeat(Math.max(0, state.lives));
+
+    const c = state.activeCook;
+    if (!c) {
+      $('#cookName').textContent = '대기중';
+      $('#cookTime').textContent = '0.0s';
+      $('#cookBar').style.transform = 'scaleX(0)';
+    } else {
+      $('#cookName').textContent = `${RECIPES[c.key].emoji} ${RECIPES[c.key].name}`;
+      $('#cookTime').textContent = `${(c.left / 1000).toFixed(1)}s`;
+      const p = 1 - c.left / c.total;
+      $('#cookBar').style.transform = `scaleX(${Math.max(0, Math.min(1, p))})`;
+    }
+  }
+
+  function renderOrders(){
+    ordersEl.innerHTML = '';
+    state.orders.forEach(o => {
+      const d = document.createElement('div');
+      d.className = 'order';
+      const ratio = Math.max(0, o.left / o.max);
+      d.innerHTML = `
+        <div>
+          <div class="name">${RECIPES[o.key].emoji} ${RECIPES[o.key].name}</div>
+          <div class="muted">보상 ${o.reward.toLocaleString()}G</div>
+        </div>
+        <div class="bar"><i style="transform:scaleX(${ratio})"></i></div>
+      `;
+      ordersEl.appendChild(d);
+    });
+  }
+
+  function renderRecipes(){
+    recipesEl.innerHTML = '';
+    RECIPE_KEYS.forEach(key => {
+      const r = RECIPES[key];
+      const b = document.createElement('button');
+      b.className = 'recipe';
+      b.innerHTML = `${r.emoji} ${r.name}<small>${(r.cookMs/1000).toFixed(1)}초 · +${r.reward}G</small>`;
+      b.disabled = !!state.activeCook || !state.running || state.paused || state.ended;
+      b.onclick = () => startCook(key, b);
+      recipesEl.appendChild(b);
+    });
+  }
+
+  function renderTray(){
+    trayEl.innerHTML = '';
+    RECIPE_KEYS.forEach(key => {
+      const r = RECIPES[key];
+      const count = state.tray[key] || 0;
+      const b = document.createElement('button');
+      b.className = 'serve';
+      b.disabled = count <= 0 || !state.running || state.paused || state.ended;
+      b.innerHTML = `${r.emoji} ${r.name} · ${count}`;
+      b.onclick = () => serveByKey(key, b);
+      trayEl.appendChild(b);
+    });
+  }
+
+  function recipeRand(){ return RECIPE_KEYS[(Math.random() * RECIPE_KEYS.length) | 0]; }
+
+  function spawnOrder(){
+    if (state.orders.length >= 7) return;
+    const key = recipeRand();
+    const base = 7000 + Math.random() * 3000;
+    const reward = RECIPES[key].reward + ((Math.random() * 35) | 0);
+    state.orders.push({
+      id: state.orderSeq++,
+      key,
+      max: base,
+      left: base,
+      reward
+    });
+  }
+
+  function startCook(key, btn){
+    if (state.activeCook || !state.running || state.paused || state.ended) return;
+    const r = RECIPES[key];
+    state.activeCook = { key, total: r.cookMs, left: r.cookMs };
+    playSfx('start');
+    pop(btn, '#22d3ee');
+    $('#statusText').textContent = `${r.name} 조리 시작`;
+    renderRecipes();
+  }
+
+  function completeCook(){
+    if (!state.activeCook) return;
+    const key = state.activeCook.key;
+    state.tray[key] += 1;
+    state.activeCook = null;
+    playSfx('done');
+    toast(`${RECIPES[key].name} 완성!`);
+    renderTray();
+    renderRecipes();
+  }
+
+  function serveByKey(key, btn){
+    if ((state.tray[key] || 0) <= 0 || !state.running || state.paused || state.ended) return;
+
+    const idx = state.orders.findIndex(o => o.key === key);
+    if (idx < 0) {
+      playSfx('miss');
+      toast('해당 주문 없음');
+      pop(btn, '#f43f5e');
+      return;
+    }
+
+    const order = state.orders[idx];
+    state.orders.splice(idx, 1);
+    state.tray[key] -= 1;
+
+    state.combo += 1;
+    const bonus = Math.floor(order.reward * Math.min(0.5, state.combo * 0.03));
+    const gain = order.reward + bonus;
+    state.runCoin += gain;
+    state.served += 1;
+
+    playSfx('serve');
+    pop(btn, '#22c55e');
+    floatText(`+${gain}G`, 190, 190);
+    $('#statusText').textContent = `${RECIPES[key].name} 서빙 성공! (콤보 x${state.combo})`;
+
+    renderOrders();
+    renderTray();
+    updateHUD();
+  }
+
+  function missOrder(){
+    state.lives -= 1;
+    state.missed += 1;
+    state.combo = 0;
+    playSfx('miss');
+    floatText('주문 실패!', 180, 160, true);
+    toast('주문 실패 - 생명 감소');
+    if (state.lives <= 0) endGame('손님 클레임 폭주!');
+  }
+
+  function decay(v){
+    if (v <= 120) return 1;
+    if (v <= 480) return 0.6;
+    return 0.25;
+  }
+
+  function tryOfflineClaim(){
+    const now = nowMs();
+    const min = Math.min(1440, Math.max(0, Math.floor((now - state.wallet.lastSeenAtMs)/60000)));
+    if (min < 5) return;
+
+    const d = decay(min);
+    const gold = Math.floor(state.wallet.baseRPM * min * d);
+    const free = Math.min(40, Math.floor(min / 30));
+
+    const panel = $('#overlay');
+    $('#ovTitle').textContent = '오프라인 수익 도착';
+    $('#ovDesc').innerHTML = `미접속 ${min}분 · 감쇠 ${d}<br>골드 +${gold.toLocaleString()} / 무료캐시 +${free}`;
+    $('#btnRestart').textContent = '무료 수령';
+    panel.classList.add('show');
+
+    $('#btnRestart').onclick = () => {
+      state.wallet.gold += gold;
+      state.wallet.freeCash += free;
+      state.wallet.lastSeenAtMs = now;
+      saveWallet();
+      panel.classList.remove('show');
+      $('#btnRestart').textContent = '다시 시작';
+      bindRestart();
+      updateHUD();
+      toast('오프라인 보상 수령 완료');
+    };
+  }
+
+  function endGame(reason = '라운드 종료'){
+    if (state.ended) return;
+    state.running = false;
+    state.paused = false;
+    state.ended = true;
+
+    state.wallet.gold += state.runCoin;
+    const perMin = state.runCoin / Math.max(1, (state.gameMs - state.leftMs) / 60000);
+    state.wallet.baseRPM = Math.max(80, Math.round(state.wallet.baseRPM * 0.8 + perMin * 0.2));
+    state.wallet.lastSeenAtMs = nowMs();
+    saveWallet();
+
+    $('#ovTitle').textContent = reason;
+    $('#ovDesc').innerHTML = `획득 골드: <b>${state.runCoin.toLocaleString()}</b><br>서빙 ${state.served} / 실패 ${state.missed}<br>추정 분당수익(baseRPM): ${state.wallet.baseRPM}`;
+    $('#overlay').classList.add('show');
+    $('#btnRestart').textContent = '다시 시작';
+    bindRestart();
+
+    updateHUD();
+    renderRecipes();
+    renderTray();
+    renderOrders();
+  }
+
+  function resetRound(){
+    state.running = false;
+    state.paused = false;
+    state.ended = false;
+    state.leftMs = state.gameMs;
+    state.lives = 3;
+    state.combo = 0;
+    state.runCoin = 0;
+    state.served = 0;
+    state.missed = 0;
+    state.orders = [];
+    state.spawnCd = 1200;
+    state.activeCook = null;
+    state.tray = { fish: 0, hotteok: 0, odeng: 0, tteok: 0 };
+    state.lastTs = 0;
+    $('#statusText').textContent = '준비 완료. 게임 시작을 누르세요.';
+    $('#overlay').classList.remove('show');
+    renderOrders();
+    renderRecipes();
+    renderTray();
+    updateHUD();
+  }
+
+  function togglePause(){
+    if (!state.running || state.ended) return;
+    state.paused = !state.paused;
+    $('#btnPause').textContent = state.paused ? '재개' : '일시정지';
+    $('#statusText').textContent = state.paused ? '일시정지' : '진행 중';
+  }
+
+  function startGame(){
+    if (state.running || state.ended) return;
+    state.running = true;
+    state.paused = false;
+    $('#btnPause').textContent = '일시정지';
+    $('#statusText').textContent = '영업 시작! 주문 처리하세요.';
+    spawnOrder();
+    spawnOrder();
+    renderOrders();
+    renderRecipes();
+    renderTray();
+    updateHUD();
+    ensureAudio();
+  }
+
+  function loop(ts){
+    if (!state.lastTs) state.lastTs = ts;
+    const dt = ts - state.lastTs;
+    state.lastTs = ts;
+
+    if (state.running && !state.paused && !state.ended){
+      state.leftMs -= dt;
+      if (state.leftMs <= 0){
+        state.leftMs = 0;
+        endGame('영업 종료');
+      }
+
+      // spawn
+      state.spawnCd -= dt;
+      if (state.spawnCd <= 0){
+        spawnOrder();
+        state.spawnCd = 1400 + Math.random() * 2200;
+      }
+
+      // order patience
+      for (let i = state.orders.length - 1; i >= 0; i--){
+        const o = state.orders[i];
+        o.left -= dt;
+        if (o.left <= 0){
+          state.orders.splice(i, 1);
+          missOrder();
+        }
+      }
+
+      // cook timer
+      if (state.activeCook){
+        state.activeCook.left -= dt;
+        if (state.activeCook.left <= 0) completeCook();
+      }
+
+      renderOrders();
+      renderRecipes();
+      renderTray();
+      updateHUD();
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  function bindRestart(){
+    $('#btnRestart').onclick = () => {
+      resetRound();
+      startGame();
+    };
+  }
+
+  function pop(el, color){
+    const r = el.getBoundingClientRect();
+    floatText('✨', r.left - 120 + r.width / 2, r.top - 6, false);
+    el.style.boxShadow = `0 0 0 2px ${color}66`;
+    setTimeout(() => { el.style.boxShadow = ''; }, 180);
+  }
+
+  // ---------- Audio ----------
+  function ensureAudio(){
+    if (state.audioCtx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    state.audioCtx = new AC();
+  }
+
+  function tone(f, d = 0.1, t = 'triangle', v = 0.08, at = null){
+    if (!state.audioCtx || !state.audioOn) return;
+    const ctx = state.audioCtx;
+    const t0 = at ?? ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = t;
+    o.frequency.setValueAtTime(f, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(v, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    o.connect(g).connect(ctx.destination);
+    o.start(t0);
+    o.stop(t0 + d + 0.02);
+  }
+
+  function playSfx(type){
+    if (!state.audioCtx) return;
+    const t = state.audioCtx.currentTime;
+    if (type === 'serve') {
+      tone(640,0.08,'triangle',0.14,t);
+      tone(880,0.1,'sine',0.12,t+0.03);
+    } else if (type === 'miss') {
+      tone(240,0.11,'square',0.16,t);
+      tone(180,0.15,'square',0.12,t+0.04);
+    } else if (type === 'done') {
+      tone(740,0.08,'triangle',0.1,t);
+    } else {
+      tone(520,0.06,'triangle',0.08,t);
+    }
+  }
+
+  // ---------- Bind ----------
+  $('#btnPause').onclick = togglePause;
+  $('#btnStart').onclick = () => {
+    if (!state.running && !state.ended) {
+      startGame();
+    } else if (state.ended) {
+      resetRound();
+      startGame();
+    }
+  };
+
+  document.addEventListener('pointerdown', () => {
+    ensureAudio();
+    if (state.audioCtx?.state === 'suspended') state.audioCtx.resume();
+  }, { passive: true });
+
+  // boot
+  state.wallet = loadWallet();
+  updateHUD();
+  renderOrders();
+  renderRecipes();
+  renderTray();
+  bindRestart();
+  tryOfflineClaim();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
