@@ -201,14 +201,30 @@
     ranking: null,
     selectedSku: null,
     audioReady: false,
-    audioOn: false,
+    audioOn: true,
     audioCtx: null,
     bgmTimer: null,
-    particles: []
+    particles: [],
+    lastSfxAt: 0
   };
 
   const $ = (q) => document.querySelector(q);
   const $$ = (q) => [...document.querySelectorAll(q)];
+
+  document.addEventListener('pointerdown', (e) => {
+    const t = e.target.closest('button,.tab,.buy,.nav,.select');
+    if (!t) return;
+    unlockAudio();
+    if (state.audioOn) clickSfx();
+  }, { passive: true });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopCuteBgm();
+    else if (state.audioOn) {
+      unlockAudio();
+      startCuteBgm();
+    }
+  });
 
   const fxCanvas = $('#fxCanvas');
   const fx = fxCanvas.getContext('2d');
@@ -265,9 +281,11 @@
   }
 
   function unlockAudio(){
+    ensureAudio();
     if (state.audioCtx && state.audioCtx.state === 'suspended') {
       state.audioCtx.resume();
     }
+    if (state.audioOn) startCuteBgm();
   }
 
   function tone(freq, dur = 0.08, type = 'triangle', vol = 0.05, at = null) {
@@ -288,6 +306,13 @@
 
   function playClick(){
     tone(880, 0.06, 'triangle', 0.03);
+  }
+
+  function clickSfx(){
+    const now = performance.now();
+    if (now - state.lastSfxAt < 110) return;
+    state.lastSfxAt = now;
+    playClick();
   }
 
   function playHit(){
@@ -354,7 +379,7 @@
     const box = $('#shopTabs');
     box.innerHTML = tabs.map(t=>`<button class="tab ${state.shopTab===t.key?'active':''}" data-tab="${t.key}">${t.label}</button>`).join('');
     box.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
-      playClick();
+      clickSfx();
       const c = centerOf(b); burst(c.x, c.y, '#f472b6');
       state.shopTab=b.dataset.tab;
       renderShop();
@@ -378,7 +403,7 @@
 
     $('#shopList').querySelectorAll('.buy').forEach(btn=>{
       btn.onclick = () => {
-        playClick();
+        clickSfx();
         const c = centerOf(btn); burst(c.x, c.y, '#22d3ee');
         state.selectedSku = list.find(x=>x.id===btn.dataset.id);
         $('#buyName').textContent = state.selectedSku.name;
@@ -404,14 +429,14 @@
   // events
   $$('.nav').forEach(n=>n.onclick=()=>{
     unlockAudio();
-    playClick();
+    clickSfx();
     const c = centerOf(n); burst(c.x, c.y, '#f472b6');
     setScreen(n.dataset.screen);
   });
 
   $('#quickShop').onclick = (e) => {
     unlockAudio();
-    playClick();
+    clickSfx();
     const c = centerOf(e.currentTarget); burst(c.x, c.y, '#22d3ee');
     setScreen('shop');
   };
@@ -424,7 +449,7 @@
     const c = centerOf(e.currentTarget); burst(c.x, c.y, state.audioOn ? '#22d3ee' : '#f472b6');
     if (state.audioOn) {
       startCuteBgm();
-      playClick();
+      clickSfx();
       toast('사운드 ON 🎵');
     } else {
       stopCuteBgm();
@@ -434,14 +459,14 @@
 
   $('#btnOffline2x').onclick = (e) => {
     unlockAudio();
-    playClick();
+    clickSfx();
     const c = centerOf(e.currentTarget); burst(c.x, c.y, '#22d3ee');
     $('#offlineModal').classList.add('show');
   };
 
   $('#offCancel').onclick = (e) => {
     unlockAudio();
-    playClick();
+    clickSfx();
     const c = centerOf(e.currentTarget); burst(c.x, c.y, '#f9a8d4');
     $('#offlineModal').classList.remove('show');
   };
@@ -456,7 +481,7 @@
 
   $('#buyCancel').onclick = (e) => {
     unlockAudio();
-    playClick();
+    clickSfx();
     const c = centerOf(e.currentTarget); burst(c.x, c.y, '#f9a8d4');
     $('#buySheet').classList.remove('show');
   };
@@ -472,8 +497,8 @@
     toast(`${name} 결제 완료`);
   };
 
-  $('#scopeSel').onchange = (e) => { unlockAudio(); playClick(); const c=centerOf(e.currentTarget); burst(c.x,c.y,'#f472b6'); renderRank(); };
-  $('#typeSel').onchange = (e) => { unlockAudio(); playClick(); const c=centerOf(e.currentTarget); burst(c.x,c.y,'#22d3ee'); renderRank(); };
+  $('#scopeSel').onchange = (e) => { unlockAudio(); clickSfx(); const c=centerOf(e.currentTarget); burst(c.x,c.y,'#f472b6'); renderRank(); };
+  $('#typeSel').onchange = (e) => { unlockAudio(); clickSfx(); const c=centerOf(e.currentTarget); burst(c.x,c.y,'#22d3ee'); renderRank(); };
 
   // bootstrap
   try {
