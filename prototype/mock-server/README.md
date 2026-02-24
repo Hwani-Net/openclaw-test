@@ -22,6 +22,7 @@ node server.mjs
 - `GET /api/rankings?scope=country&period=weekly&type=skill`
 - `POST /api/rankings/submit`
 - `GET /api/missions/daily?uid=6702395893`
+- `POST /api/missions/claim`
 - `POST /api/pass/claim`
 
 ## Quick curl samples

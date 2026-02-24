@@ -12,6 +12,7 @@ const ranking = JSON.parse(readFileSync(path.join(mockDir, 'ranking.json'), 'utf
 
 const txSeen = new Set();
 const claimedRewards = new Set();
+const claimedMissions = new Set();
 const users = new Map();
 
 function getUser(uid = 'guest') {
@@ -20,7 +21,12 @@ function getUser(uid = 'guest') {
       uid,
       wallet: { gold: 128550, freeCash: 480, paidCash: 120 },
       baseRPM: 185,
-      lastSeenAtMs: Date.now() - 260 * 60 * 1000
+      lastSeenAtMs: Date.now() - 260 * 60 * 1000,
+      stats: {
+        servedTotal: 0,
+        bestCombo: 0,
+        invitedFriends: 0
+      }
     });
   }
   return users.get(uid);
@@ -231,30 +237,38 @@ const server = http.createServer(async (req, res) => {
         runGold = 0,
         playedMs = 60000,
         served = 0,
-        missed = 0
+        missed = 0,
+        maxCombo = 0
       } = body;
 
       const user = getUser(uid);
       const runGoldNum = Math.max(0, Number(runGold) || 0);
       const playedMin = Math.max(1, (Number(playedMs) || 60000) / 60000);
       const perMin = runGoldNum / playedMin;
+      const servedNum = Math.max(0, Number(served) || 0);
+      const maxComboNum = Math.max(0, Number(maxCombo) || 0);
 
       user.wallet.gold += runGoldNum;
       user.baseRPM = Math.max(80, Math.round(user.baseRPM * 0.8 + perMin * 0.2));
       user.lastSeenAtMs = Date.now();
+
+      user.stats.servedTotal += servedNum;
+      user.stats.bestCombo = Math.max(user.stats.bestCombo, maxComboNum);
 
       return send(res, 200, {
         ok: true,
         uid,
         summary: {
           runGold: runGoldNum,
-          served: Number(served) || 0,
+          served: servedNum,
           missed: Number(missed) || 0,
-          playedMs: Number(playedMs) || 0
+          playedMs: Number(playedMs) || 0,
+          maxCombo: maxComboNum
         },
         wallet: user.wallet,
         baseRPM: user.baseRPM,
         lastSeenAtMs: user.lastSeenAtMs,
+        stats: user.stats,
         serverTime: Date.now()
       });
     }
@@ -293,14 +307,71 @@ const server = http.createServer(async (req, res) => {
 
     if (method === 'GET' && u.pathname === '/api/missions/daily') {
       const uid = u.searchParams.get('uid') || 'guest';
+      const user = getUser(uid);
+      const missions = [
+        {
+          id: 'm1',
+          title: '붕어빵/호떡/어묵/떡볶이 총 80개 판매',
+          progress: Math.min(80, user.stats.servedTotal),
+          goal: 80,
+          reward: { gold: 1200 }
+        },
+        {
+          id: 'm2',
+          title: '최대 콤보 20 달성',
+          progress: Math.min(20, user.stats.bestCombo),
+          goal: 20,
+          reward: { freeCash: 4 }
+        },
+        {
+          id: 'm3',
+          title: '친구 1명 초대',
+          progress: Math.min(1, user.stats.invitedFriends),
+          goal: 1,
+          reward: { freeCash: 8 }
+        }
+      ].map((m) => ({
+        ...m,
+        claimed: claimedMissions.has(`${uid}:${m.id}`)
+      }));
+
       return send(res, 200, {
         ok: true,
         uid,
-        missions: [
-          { id: 'm1', title: '붕어빵 80개 판매', progress: 32, goal: 80, reward: { gold: 1200 } },
-          { id: 'm2', title: '콤보 20회 달성', progress: 7, goal: 20, reward: { freeCash: 4 } },
-          { id: 'm3', title: '친구 1명 초대', progress: 0, goal: 1, reward: { freeCash: 8 } }
-        ]
+        missions,
+        stats: user.stats
+      });
+    }
+
+    if (method === 'POST' && u.pathname === '/api/missions/claim') {
+      const body = await parseBody(req);
+      const { uid = 'guest', missionId } = body;
+      if (!missionId) return badRequest(res, 'missionId required');
+
+      const user = getUser(uid);
+      const key = `${uid}:${missionId}`;
+      if (claimedMissions.has(key)) return badRequest(res, 'mission already claimed');
+
+      const missionMap = {
+        m1: { goal: 80, progress: user.stats.servedTotal, reward: { gold: 1200 } },
+        m2: { goal: 20, progress: user.stats.bestCombo, reward: { freeCash: 4 } },
+        m3: { goal: 1, progress: user.stats.invitedFriends, reward: { freeCash: 8 } }
+      };
+
+      const m = missionMap[missionId];
+      if (!m) return badRequest(res, 'invalid missionId');
+      if ((m.progress || 0) < m.goal) return badRequest(res, 'mission not complete');
+
+      claimedMissions.add(key);
+      user.wallet.gold += m.reward.gold || 0;
+      user.wallet.freeCash += m.reward.freeCash || 0;
+
+      return send(res, 200, {
+        ok: true,
+        uid,
+        missionId,
+        reward: m.reward,
+        wallet: user.wallet
       });
     }
 

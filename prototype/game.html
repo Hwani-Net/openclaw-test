@@ -85,15 +85,16 @@
       background:repeating-linear-gradient(90deg,#f87171 0 12px,#fef08a 12px 24px);
       opacity:.9;
     }
-    .topbar .sound{
+    .topbar .top-btn{
       border:1px solid #f59e0b;
       background:linear-gradient(180deg,#fde68a,#f59e0b);
       color:#7c2d12;
       border-radius:11px;
-      padding:7px 10px;
+      padding:7px 9px;
       font-weight:900;
       min-width:42px;
       box-shadow:0 6px 14px rgba(251,146,60,.35);
+      font-size:12px;
     }
 
     .hud-grid{
@@ -208,9 +209,9 @@
     }
     .tray-btn:disabled{opacity:.5}
 
-    .cook-btn,.tray-btn,.btn,.sound{transition:transform .08s ease, filter .2s ease, box-shadow .2s ease}
-    .cook-btn:hover,.tray-btn:hover,.btn:hover,.sound:hover{filter:brightness(1.05)}
-    .cook-btn:active,.tray-btn:active,.btn:active,.sound:active{transform:scale(.97)}
+    .cook-btn,.tray-btn,.btn,.top-btn{transition:transform .08s ease, filter .2s ease, box-shadow .2s ease}
+    .cook-btn:hover,.tray-btn:hover,.btn:hover,.top-btn:hover{filter:brightness(1.05)}
+    .cook-btn:active,.tray-btn:active,.btn:active,.top-btn:active{transform:scale(.97)}
 
     .controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
     .btn{
@@ -277,6 +278,28 @@
       box-shadow:0 16px 40px rgba(0,0,0,.45);
       color:#f8fafc;
     }
+    .panel .muted{color:#cbd5e1}
+    .panel-body{margin-top:8px;display:grid;gap:8px;max-height:52vh;overflow:auto;padding-right:2px}
+    .rank-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .rank-toolbar select,.mission-btn,.panel-close{
+      border:1px solid #475569;
+      background:#0b1220;
+      color:#f8fafc;
+      border-radius:10px;
+      padding:8px;
+      font-weight:800;
+    }
+    .rank-row,.mission-row{
+      border:1px solid #334155;
+      border-radius:10px;
+      padding:8px;
+      background:#0b1220;
+      display:grid;
+      gap:4px;
+    }
+    .panel .r{font-size:12px;color:#cbd5e1}
+    .mission-progress{height:7px;border-radius:999px;background:#111827;border:1px solid #334155;overflow:hidden}
+    .mission-progress i{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#22c55e)}
 
     #fx{position:fixed;inset:0;pointer-events:none;z-index:68}
 
@@ -298,7 +321,9 @@
         <div class="muted" style="color:#fde68a">늦은 밤, 주문 폭주 시작!</div>
       </div>
       <div class="row" style="justify-content:flex-end">
-        <button class="sound" id="soundBtn">🔊</button>
+        <button class="top-btn" id="missionBtn">미션</button>
+        <button class="top-btn" id="rankBtn">랭킹</button>
+        <button class="top-btn" id="soundBtn">🔊</button>
       </div>
     </div>
 
@@ -361,6 +386,17 @@
         </div>
       </div>
     </div>
+
+    <div class="overlay" id="dataOverlay">
+      <div class="panel">
+        <div class="row between">
+          <div class="title" id="dataTitle">패널</div>
+          <button class="panel-close" id="dataClose">닫기</button>
+        </div>
+        <div id="dataControls" class="rank-toolbar" style="margin-top:8px;display:none"></div>
+        <div id="dataBody" class="panel-body"></div>
+      </div>
+    </div>
   </div>
 
   <canvas id="fx"></canvas>
@@ -383,6 +419,10 @@
   const customersEl = $('#customers');
   const stationsEl = $('#stations');
   const trayEl = $('#tray');
+  const dataOverlay = $('#dataOverlay');
+  const dataTitle = $('#dataTitle');
+  const dataBody = $('#dataBody');
+  const dataControls = $('#dataControls');
 
   const fxCanvas = $('#fx');
   const fx = fxCanvas.getContext('2d');
@@ -401,6 +441,7 @@
     totalMs: 120000,
     lives: 3,
     combo: 0,
+    maxCombo: 0,
     runGold: 0,
     feverUntil: 0,
     served: 0,
@@ -420,7 +461,8 @@
     audioCtx: null,
     audioOn: true,
     bgmTimer: null,
-    masterGain: null
+    masterGain: null,
+    localMissionClaimed: {}
   };
 
   function now(){ return Date.now(); }
@@ -464,6 +506,17 @@
 
   function saveWallet(){
     if (!hasApi()) localStorage.setItem(WALLET_KEY, JSON.stringify(state.wallet));
+  }
+
+  const LOCAL_MISSION_KEY = 'ppocha_local_mission_claimed_v1';
+  function loadLocalMissionClaimed(){
+    try {
+      const m = JSON.parse(localStorage.getItem(LOCAL_MISSION_KEY) || '{}');
+      return m && typeof m === 'object' ? m : {};
+    } catch { return {}; }
+  }
+  function saveLocalMissionClaimed(){
+    localStorage.setItem(LOCAL_MISSION_KEY, JSON.stringify(state.localMissionClaimed || {}));
   }
 
   function toast(msg){
@@ -624,6 +677,7 @@
     state.orders.splice(index, 1);
 
     state.combo += 1;
+    state.maxCombo = Math.max(state.maxCombo, state.combo);
     if (state.combo >= 5 && state.feverUntil < now()) {
       state.feverUntil = now() + 12000;
       toast('🔥 FEVER ON!');
@@ -758,6 +812,221 @@
     };
   }
 
+  function closeDataPanel(){
+    dataOverlay.classList.remove('show');
+    dataControls.style.display = 'none';
+    dataControls.innerHTML = '';
+    dataBody.innerHTML = '';
+  }
+
+  function rankingFallback(scope, type){
+    const byType = {
+      skill: {
+        world: [
+          { rank: 1, name: 'NeoChef_99', score: 128940, region: 'Seoul' },
+          { rank: 2, name: 'TokyoRush', score: 127310, region: 'Tokyo' },
+          { rank: 3, name: 'BusanAce', score: 124880, region: 'Busan' }
+        ],
+        country: [
+          { rank: 1, name: 'HwaniMaster', score: 119920, region: 'KR' },
+          { rank: 2, name: 'DaejeonFox', score: 115400, region: 'KR' },
+          { rank: 3, name: 'JejuWind', score: 112800, region: 'KR' }
+        ],
+        city: [
+          { rank: 1, name: 'MapoChef', score: 90210, region: 'Seoul' },
+          { rank: 2, name: 'YeonnamKing', score: 88910, region: 'Seoul' },
+          { rank: 3, name: 'HongdaeStar', score: 87300, region: 'Seoul' }
+        ],
+        neighborhood: [
+          { rank: 1, name: 'BungeoAce', score: 55420, region: 'Yeonnam-dong' },
+          { rank: 2, name: 'ManduBoss', score: 54790, region: 'Yeonnam-dong' },
+          { rank: 3, name: 'NightChef', score: 52510, region: 'Yeonnam-dong' }
+        ],
+        friends: [
+          { rank: 1, name: '대표님', score: 110220, region: 'KR' },
+          { rank: 2, name: 'Antigravity', score: 106200, region: 'KR' },
+          { rank: 3, name: 'OpenClawFan', score: 99500, region: 'KR' }
+        ]
+      },
+      business: {
+        world: [
+          { rank: 1, name: 'CashFlowMax', score: 9820000, region: 'LA' },
+          { rank: 2, name: 'MarketTiger', score: 9640000, region: 'Berlin' },
+          { rank: 3, name: 'GangnamBoss', score: 9510000, region: 'Seoul' }
+        ],
+        country: [
+          { rank: 1, name: 'HwaniMaster', score: 9210000, region: 'KR' },
+          { rank: 2, name: 'MapoChef', score: 9030000, region: 'KR' },
+          { rank: 3, name: 'IncheonPro', score: 8890000, region: 'KR' }
+        ],
+        city: [
+          { rank: 1, name: 'YeonnamKing', score: 4720000, region: 'Seoul' },
+          { rank: 2, name: 'ManduBoss', score: 4610000, region: 'Seoul' },
+          { rank: 3, name: 'StreetLegend', score: 4550000, region: 'Seoul' }
+        ],
+        neighborhood: [
+          { rank: 1, name: 'NightChef', score: 2880000, region: 'Yeonnam-dong' },
+          { rank: 2, name: 'BungeoAce', score: 2810000, region: 'Yeonnam-dong' },
+          { rank: 3, name: 'HotteokPro', score: 2780000, region: 'Yeonnam-dong' }
+        ],
+        friends: [
+          { rank: 1, name: '대표님', score: 4980000, region: 'KR' },
+          { rank: 2, name: 'Antigravity', score: 4770000, region: 'KR' },
+          { rank: 3, name: 'OpenClawFan', score: 4520000, region: 'KR' }
+        ]
+      }
+    };
+    return (byType[type] && byType[type][scope]) || byType.skill.country;
+  }
+
+  async function openRankingPanel(){
+    dataTitle.textContent = '랭킹';
+    dataOverlay.classList.add('show');
+    dataControls.style.display = 'grid';
+    dataControls.innerHTML = `
+      <select id="rankScopeSel">
+        <option value="world">월드</option>
+        <option value="country" selected>국가</option>
+        <option value="city">도시</option>
+        <option value="neighborhood">동네</option>
+        <option value="friends">친구</option>
+      </select>
+      <select id="rankTypeSel">
+        <option value="skill" selected>실력 점수</option>
+        <option value="business">운영 점수</option>
+      </select>
+    `;
+
+    const scopeSel = $('#rankScopeSel');
+    const typeSel = $('#rankTypeSel');
+
+    const render = async () => {
+      const scope = scopeSel.value;
+      const type = typeSel.value;
+      let rows = [];
+
+      if (hasApi()) {
+        try {
+          const r = await apiFetch(`/api/rankings?scope=${scope}&period=weekly&type=${type}`);
+          rows = r.rows || [];
+          state.apiOnline = true;
+        } catch {
+          state.apiOnline = false;
+          rows = rankingFallback(scope, type);
+        }
+      } else {
+        rows = rankingFallback(scope, type);
+      }
+
+      dataBody.innerHTML = rows.map((row) => `
+        <div class="rank-row">
+          <div class="row between">
+            <b>#${row.rank} ${row.name}</b>
+            <span class="r">${row.region}</span>
+          </div>
+          <div class="r">점수: ${Number(row.score).toLocaleString()}</div>
+        </div>
+      `).join('');
+      updateHUD();
+    };
+
+    scopeSel.onchange = render;
+    typeSel.onchange = render;
+    await render();
+  }
+
+  function localMissionList(){
+    const claimed = state.localMissionClaimed || {};
+    const servedProgress = Math.min(80, state.served);
+    const comboProgress = Math.min(20, state.maxCombo);
+    return [
+      { id: 'm1', title: '총 80개 판매', progress: servedProgress, goal: 80, reward: { gold: 1200 }, claimed: !!claimed.m1 },
+      { id: 'm2', title: '최대 콤보 20 달성', progress: comboProgress, goal: 20, reward: { freeCash: 4 }, claimed: !!claimed.m2 },
+      { id: 'm3', title: '친구 1명 초대', progress: 0, goal: 1, reward: { freeCash: 8 }, claimed: !!claimed.m3 }
+    ];
+  }
+
+  async function openMissionPanel(){
+    dataTitle.textContent = '일일 미션';
+    dataOverlay.classList.add('show');
+    dataControls.style.display = 'none';
+    dataControls.innerHTML = '';
+
+    let missions = [];
+
+    if (hasApi()) {
+      try {
+        const r = await apiFetch(`/api/missions/daily?uid=${encodeURIComponent(state.uid)}`);
+        missions = r.missions || [];
+        state.apiOnline = true;
+      } catch {
+        state.apiOnline = false;
+        missions = localMissionList();
+      }
+    } else {
+      missions = localMissionList();
+    }
+
+    dataBody.innerHTML = missions.map((m) => {
+      const pct = Math.max(0, Math.min(100, Math.floor((m.progress / m.goal) * 100)));
+      const complete = m.progress >= m.goal;
+      const rewardText = `${m.reward.gold ? `골드 +${m.reward.gold}` : ''}${m.reward.freeCash ? ` 무료캐시 +${m.reward.freeCash}` : ''}`.trim();
+      return `
+        <div class="mission-row" data-mid="${m.id}">
+          <div class="row between">
+            <b>${m.title}</b>
+            <span class="r">${m.progress}/${m.goal}</span>
+          </div>
+          <div class="mission-progress"><i style="width:${pct}%"></i></div>
+          <div class="row between">
+            <span class="r">보상: ${rewardText}</span>
+            <button class="mission-btn" data-claim="${m.id}" ${(!complete || m.claimed) ? 'disabled' : ''}>${m.claimed ? '수령완료' : '수령'}</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    dataBody.querySelectorAll('[data-claim]').forEach((btn) => {
+      btn.onclick = async () => {
+        const mid = btn.getAttribute('data-claim');
+        if (!mid) return;
+
+        if (hasApi()) {
+          try {
+            const r = await apiFetch('/api/missions/claim', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ uid: state.uid, missionId: mid })
+            });
+            state.apiOnline = true;
+            state.wallet = { ...state.wallet, ...r.wallet };
+            updateHUD();
+            toast('미션 보상 수령 완료');
+            playSfx('serve');
+            await openMissionPanel();
+          } catch {
+            state.apiOnline = false;
+            toast('미션 수령 실패');
+          }
+        } else {
+          const mission = missions.find((x) => x.id === mid);
+          if (!mission || mission.claimed || mission.progress < mission.goal) return;
+          state.localMissionClaimed[mid] = true;
+          state.wallet.gold += mission.reward.gold || 0;
+          state.wallet.freeCash += mission.reward.freeCash || 0;
+          saveWallet();
+          saveLocalMissionClaimed();
+          updateHUD();
+          toast('미션 보상 수령 완료');
+          playSfx('serve');
+          openMissionPanel();
+        }
+      };
+    });
+
+    updateHUD();
+  }
+
   function endGame(reason = '라운드 종료'){
     if (state.ended) return;
     state.running = false;
@@ -775,7 +1044,8 @@
           runGold: state.runGold,
           playedMs,
           served: state.served,
-          missed: state.missed
+          missed: state.missed,
+          maxCombo: state.maxCombo
         })
       }).then((r) => {
         state.apiOnline = true;
@@ -830,6 +1100,7 @@
     state.leftMs = state.totalMs;
     state.lives = 3;
     state.combo = 0;
+    state.maxCombo = 0;
     state.runGold = 0;
     state.feverUntil = 0;
     state.served = 0;
@@ -1028,6 +1299,26 @@
     else { stopBgm(); toast('사운드 OFF'); }
   };
 
+  $('#rankBtn').onclick = async () => {
+    enableAudio();
+    playSfx('start');
+    await openRankingPanel();
+  };
+
+  $('#missionBtn').onclick = async () => {
+    enableAudio();
+    playSfx('start');
+    await openMissionPanel();
+  };
+
+  $('#dataClose').onclick = () => {
+    closeDataPanel();
+  };
+
+  dataOverlay.addEventListener('pointerdown', (e) => {
+    if (e.target === dataOverlay) closeDataPanel();
+  });
+
   document.addEventListener('pointerdown', () => {
     enableAudio();
   }, { passive: true });
@@ -1039,6 +1330,7 @@
 
   // -------- Boot --------
   (async function init(){
+    state.localMissionClaimed = loadLocalMissionClaimed();
     state.wallet = await loadWallet();
     updateHUD();
     renderCustomers();
