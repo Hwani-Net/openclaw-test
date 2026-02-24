@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Nyong Mario</title>
+  <title>Nyong Princess Run</title>
   <style>
     :root {
       --sky1: #7dd3fc;
@@ -484,18 +484,36 @@
     const blink = p.invulMs > 0 && Math.floor(p.invulMs / 80) % 2 === 0;
     if (blink) return;
 
-    // body
-    ctx.fillStyle = '#2563eb';
-    ctx.fillRect(x, p.y + 12, p.w, p.h - 12);
-    // shirt
-    ctx.fillStyle = '#ef4444';
-    ctx.fillRect(x + 5, p.y + 4, p.w - 10, 14);
-    // head
+    // hair
+    ctx.fillStyle = '#7c2d12';
+    ctx.fillRect(x + 6, p.y - 2, p.w - 12, 14);
+    if (p.dir > 0) ctx.fillRect(x + p.w - 8, p.y + 10, 6, 10);
+    else ctx.fillRect(x + 2, p.y + 10, 6, 10);
+
+    // face
     ctx.fillStyle = '#fde68a';
-    ctx.fillRect(x + 8, p.y, p.w - 16, 12);
-    // hat
-    ctx.fillStyle = '#b91c1c';
-    ctx.fillRect(x + 4, p.y - 6, p.w - 8, 8);
+    ctx.fillRect(x + 8, p.y + 2, p.w - 16, 12);
+
+    // outfit
+    ctx.fillStyle = '#ec4899';
+    ctx.fillRect(x + 6, p.y + 14, p.w - 12, 14);
+    ctx.fillStyle = '#f472b6';
+    ctx.beginPath();
+    ctx.moveTo(x + 4, p.y + 28);
+    ctx.lineTo(x + p.w - 4, p.y + 28);
+    ctx.lineTo(x + p.w - 8, p.y + p.h);
+    ctx.lineTo(x + 8, p.y + p.h);
+    ctx.closePath();
+    ctx.fill();
+
+    // boots
+    ctx.fillStyle = '#7f1d1d';
+    ctx.fillRect(x + 7, p.y + p.h - 4, 8, 4);
+    ctx.fillRect(x + p.w - 15, p.y + p.h - 4, 8, 4);
+
+    // ribbon
+    ctx.fillStyle = '#f9a8d4';
+    ctx.fillRect(x + 12, p.y - 6, p.w - 24, 4);
   }
 
   function drawOverlay() {
